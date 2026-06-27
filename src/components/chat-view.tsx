@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { PlanoChatTransport } from '@/lib/plano-transport'
 import {
   Conversation,
   ConversationContent,
@@ -29,7 +29,6 @@ import {
   PromptInputSubmit,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
-import { config } from '@/lib/config'
 
 interface ChatViewProps {
   sessionId: string
@@ -37,21 +36,14 @@ interface ChatViewProps {
 }
 
 export function ChatView({ sessionId, model }: ChatViewProps) {
-  // NOTE: egent-lobehub streams over /v1/chat/send. The exact stream format
-  // (AI SDK data-stream vs plain text vs OpenAI SSE) must be confirmed against
-  // the backend; swap DefaultChatTransport → TextStreamChatTransport or a custom
-  // transport if needed. Identity is injected by the edge from the session cookie.
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: `${config.edgeUrl}/v1/chat/send`,
-        credentials: 'include',
-        body: { sessionId, model },
-      }),
-    [sessionId, model],
-  )
+  // Streams from Plano's OpenAI-compatible model proxy via the cookie edge
+  // (`/.plano/v1/chat/completions`). The transport translates Plano's OpenAI SSE
+  // into the AI-SDK UI-message stream this view renders. Identity is injected by
+  // the edge from the Kratos session cookie. The proxy is stateless, so history
+  // is sent each turn (messages are not persisted server-side yet — see plan).
+  const transport = useMemo(() => new PlanoChatTransport({ model }), [model])
 
-  const { messages, sendMessage, status, stop } = useChat({ transport })
+  const { messages, sendMessage, status, stop } = useChat({ id: sessionId, transport })
 
   const handleSubmit = (msg: PromptInputMessage) => {
     if (!msg.text.trim()) return

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   Select,
   SelectContent,
@@ -14,6 +15,12 @@ interface ModelPickerProps {
 
 export function ModelPicker({ value, onChange }: ModelPickerProps) {
   const { data: models, isLoading } = useModels()
+
+  // Plano's model proxy requires a model id, so default to the first available
+  // one until the user picks otherwise (avoids a "Model '' not found" first turn).
+  useEffect(() => {
+    if (!value && models && models.length > 0) onChange(models[0].id)
+  }, [value, models, onChange])
 
   return (
     <Select value={value} onValueChange={(v) => v && onChange(v)}>

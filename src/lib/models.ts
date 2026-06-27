@@ -2,9 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { config } from './config'
 import type { ModelInfo } from './types'
 
-/** Lists available models from the Plano proxy (OpenAI-compatible /v1/models). */
+/**
+ * Lists available models from Plano (OpenAI-compatible /v1/models) via the
+ * cookie edge — the same CORS-enabled `/.plano/*` path the chat uses, so the
+ * browser session cookie authenticates the call.
+ */
 async function listModels(): Promise<ModelInfo[]> {
-  const res = await fetch(`${config.modelProxyUrl}/v1/models`, {
+  const res = await fetch(`${config.planoBase}/v1/models`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
   })
