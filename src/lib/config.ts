@@ -5,10 +5,10 @@
  */
 export const config = {
   /** Oathkeeper auth edge — fronts egent-lobehub (/v1/*) and pREST. */
-  edgeUrl: import.meta.env.VITE_EDGE_URL ?? 'http://localhost:4455',
+  edgeUrl: import.meta.env.VITE_EDGE_URL ?? 'https://backend.getkawai.com',
   /** Plano model proxy (OpenAI-compatible) — used to list available models. */
-  modelProxyUrl: import.meta.env.VITE_MODEL_PROXY_URL ?? 'http://localhost:12000',
+  modelProxyUrl: import.meta.env.VITE_MODEL_PROXY_URL ?? 'https://api.getkawai.com',
   /** Kratos public API base (via the edge). */
   kratosUrl:
-    import.meta.env.VITE_KRATOS_URL ?? 'http://localhost:4455/.ory/kratos/public',
+    import.meta.env.VITE_KRATOS_URL ?? 'https://backend.getkawai.com/.ory/kratos/public',
 } as const

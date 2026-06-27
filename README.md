@@ -18,9 +18,10 @@ bun run build  # tsc -b && vite build  (see caveat below)
 
 ## Environment (`.env.local`)
 ```
-VITE_EDGE_URL=http://localhost:4455              # Oathkeeper edge (egent + pREST)
-VITE_MODEL_PROXY_URL=http://localhost:12000      # Plano model proxy (/v1/models)
-VITE_KRATOS_URL=http://localhost:4455/.ory/kratos/public
+# Defaults point at the live hosts (see ../ARCHITECTURE.md). Override locally:
+VITE_EDGE_URL=https://backend.getkawai.com      # Oathkeeper edge (egent + pREST)
+VITE_MODEL_PROXY_URL=https://api.getkawai.com   # Plano model proxy (/v1/models)
+VITE_KRATOS_URL=https://backend.getkawai.com/.ory/kratos/public
 ```
 Identity is enforced at the edge from the Kratos session cookie; the app never sends a user id and
 sends `credentials: 'include'` on every backend call.
