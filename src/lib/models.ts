@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { config } from './config'
+import { useActiveApiKey } from './keys'
 import type { ModelInfo } from './types'
 
 /**
- * Lists available models from Plano (OpenAI-compatible /v1/models) via the
- * cookie edge — the same CORS-enabled `/.plano/*` path the chat uses, so the
- * browser session cookie authenticates the call.
+ * Lists available models from Plano (OpenAI-compatible /v1/models) directly,
+ * authenticated with the user's API key (Bearer). Requires an active key — the
+ * proxy rejects unauthenticated calls.
  */
-async function listModels(): Promise<ModelInfo[]> {
-  const res = await fetch(`${config.planoBase}/v1/models`, {
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
+async function listModels(apiKey: string): Promise<ModelInfo[]> {
+  const res = await fetch(`${config.modelProxyUrl}/v1/models`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
   })
   if (!res.ok) throw new Error(`models ${res.status}`)
   const json = (await res.json()) as { data?: Array<{ id: string }> }
@@ -18,9 +18,11 @@ async function listModels(): Promise<ModelInfo[]> {
 }
 
 export function useModels() {
+  const apiKey = useActiveApiKey()
   return useQuery({
-    queryKey: ['models'],
-    queryFn: listModels,
+    queryKey: ['models', apiKey],
+    queryFn: () => listModels(apiKey as string),
+    enabled: !!apiKey,
     staleTime: 5 * 60_000,
     retry: false,
   })

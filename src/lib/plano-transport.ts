@@ -1,9 +1,11 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
 import { config } from './config'
+import { getActiveApiKey } from './keys'
 
 /**
- * AI-SDK ChatTransport that streams from Plano's OpenAI-compatible model proxy
- * (reached cookie-authenticated through the Oathkeeper edge at `/.plano/*`).
+ * AI-SDK ChatTransport that streams from Plano's OpenAI-compatible model proxy.
+ * The browser calls Plano directly (CORS-enabled) with the user's own API key as
+ * a Bearer token — minted in Settings and stored locally (see lib/keys.ts).
  *
  * Plano speaks the OpenAI SSE wire format (`data: {chunk}` … `data: [DONE]`),
  * which `useChat` doesn't understand natively — so this transport translates
@@ -24,10 +26,16 @@ export class PlanoChatTransport implements ChatTransport<UIMessage> {
     options: Parameters<ChatTransport<UIMessage>['sendMessages']>[0],
   ): Promise<ReadableStream<UIMessageChunk>> {
     const { messages, abortSignal } = options
-    const res = await fetch(`${config.planoBase}/v1/chat/completions`, {
+    const apiKey = getActiveApiKey()
+    if (!apiKey) {
+      throw new Error('No API key. Generate one in Settings → API keys first.')
+    }
+    const res = await fetch(`${config.modelProxyUrl}/v1/chat/completions`, {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       signal: abortSignal,
       body: JSON.stringify({
         model: this.opts.model,

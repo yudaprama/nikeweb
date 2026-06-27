@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Plus, KeyRound, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { ViewHeader } from '@/components/view-header'
+import { KeysPanel } from '@/components/keys-panel'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -22,14 +22,6 @@ const CHARGES = [
   { label: 'Top-up', when: 'Apr 2', amount: '+$25.00' },
 ]
 
-interface ApiKey {
-  id: string
-  name: string
-  full: string
-  created: string
-  revealed: boolean
-}
-
 const WORKSPACES = [
   { id: 'personal', name: 'Personal', meta: '12 conversations · just you', active: true },
   { id: 'research', name: 'Research', meta: '2 conversations · just you', active: false },
@@ -37,13 +29,6 @@ const WORKSPACES = [
 ]
 
 export function SettingsView() {
-  const [keys, setKeys] = useState<ApiKey[]>([
-    { id: 'k1', name: 'Default key', full: 'sk-sage-7f3a9c21b8e4d6075f2a1c9e', created: 'Created Apr 2', revealed: false },
-    { id: 'k2', name: 'CLI / scripts', full: 'sk-sage-2b91e4a7c0f83d165a8b4e9c', created: 'Created Mar 18', revealed: false },
-  ])
-
-  const masked = (full: string) => `sk-sage-••••••••••••${full.slice(-4)}`
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ViewHeader title="Settings" />
@@ -121,71 +106,7 @@ export function SettingsView() {
             </TabsContent>
 
             <TabsContent value="keys">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <p className="text-muted-foreground max-w-sm text-sm">
-                  Use these keys to reach the API from your own scripts. Treat them like passwords.
-                </p>
-                <Button
-                  size="sm"
-                  className="shrink-0 gap-2"
-                  onClick={() =>
-                    setKeys((prev) => [
-                      ...prev,
-                      {
-                        id: `k${Date.now()}`,
-                        name: 'New key',
-                        full: `sk-sage-${Math.random().toString(36).slice(2, 12)}`,
-                        created: 'Just now',
-                        revealed: true,
-                      },
-                    ])
-                  }
-                >
-                  <Plus className="size-4" />
-                  Create key
-                </Button>
-              </div>
-              <div className="overflow-hidden rounded-xl border">
-                {keys.map((k, i) => (
-                  <div key={k.id}>
-                    {i > 0 && <Separator />}
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg">
-                        <KeyRound className="size-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{k.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">
-                          {k.revealed ? k.full : masked(k.full)}
-                        </div>
-                      </div>
-                      <span className="text-muted-foreground hidden text-xs sm:inline">
-                        {k.created}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setKeys((prev) =>
-                            prev.map((x) => (x.id === k.id ? { ...x, revealed: !x.revealed } : x)),
-                          )
-                        }
-                      >
-                        {k.revealed ? 'Hide' : 'Reveal'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive size-8"
-                        aria-label="Revoke"
-                        onClick={() => setKeys((prev) => prev.filter((x) => x.id !== k.id))}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <KeysPanel />
             </TabsContent>
 
             <TabsContent value="workspaces">
