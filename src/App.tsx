@@ -1,34 +1,52 @@
 import { useState } from 'react'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
-import { ChatView } from '@/components/chat-view'
-import { ModelPicker } from '@/components/model-picker'
+import { ChatPage } from '@/components/views/chat-page'
+import { AgentsView } from '@/components/views/agents-view'
+import { KnowledgeView } from '@/components/views/knowledge-view'
+import { MemoryView } from '@/components/views/memory-view'
+import { TasksView } from '@/components/views/tasks-view'
+import { SettingsView } from '@/components/views/settings-view'
 import { LoginGate } from '@/components/login-gate'
+import { useCreateSession } from '@/lib/sessions'
+import type { View } from '@/lib/views'
 
 function Workspace() {
+  const [view, setView] = useState<View>('chat')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [model, setModel] = useState<string | undefined>(undefined)
+  const createSession = useCreateSession()
+
+  const handleNewConversation = async () => {
+    const created = await createSession.mutateAsync('New conversation')
+    if (created?.id) {
+      setActiveId(created.id)
+      setView('chat')
+    }
+  }
 
   return (
     <SidebarProvider>
-      <AppSidebar activeId={activeId} onSelect={setActiveId} />
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <h1 className="font-medium">AI Agent Workspace</h1>
-          <div className="ml-auto">
-            <ModelPicker value={model} onChange={setModel} />
-          </div>
-        </header>
-        <main className="h-[calc(100dvh-3.5rem)]">
-          {activeId ? (
-            <ChatView key={activeId} sessionId={activeId} model={model} />
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              Select or start a conversation.
-            </div>
-          )}
-        </main>
+      <AppSidebar
+        view={view}
+        onView={setView}
+        onNewConversation={handleNewConversation}
+        creatingConversation={createSession.isPending}
+      />
+      <SidebarInset className="h-dvh overflow-hidden">
+        {view === 'chat' && (
+          <ChatPage
+            activeId={activeId}
+            onSelect={setActiveId}
+            model={model}
+            onModel={setModel}
+          />
+        )}
+        {view === 'agents' && <AgentsView />}
+        {view === 'knowledge' && <KnowledgeView />}
+        {view === 'memory' && <MemoryView />}
+        {view === 'tasks' && <TasksView />}
+        {view === 'settings' && <SettingsView />}
       </SidebarInset>
     </SidebarProvider>
   )
