@@ -6,6 +6,12 @@ import { config } from '@/lib/config'
 
 type FlowKind = 'login' | 'registration'
 
+/** Shown when the flow can't be loaded after one retry — almost always cookies. */
+const COOKIE_HINT =
+  "Couldn't load the sign-in form. Your browser may be blocking cookies for the " +
+  'auth domain (third-party cookies / tracking prevention). Allow cookies for this ' +
+  'site and try again.'
+
 /** Subset of the Ory Kratos UI container we render. */
 interface UiNode {
   type: string
@@ -69,12 +75,24 @@ export function KratosFlow({ kind }: { kind: FlowKind }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const initKey = `kratos:init:${kind}`
+    const retryKey = `kratos:retry:${kind}`
     const flowId = new URLSearchParams(window.location.search).get('flow')
+
     if (!flowId) {
       // No flow yet — bounce to Kratos to create one; it redirects back with ?flow=.
+      // Guard against a no-flow loop (e.g. cookies blocked so the flow never sticks).
+      if (sessionStorage.getItem(initKey)) {
+        sessionStorage.removeItem(initKey)
+        setError(COOKIE_HINT)
+        return
+      }
+      sessionStorage.setItem(initKey, '1')
       window.location.href = browserInitUrl(kind)
       return
     }
+    // We have a flow id — the init step landed. Clear the init guard.
+    sessionStorage.removeItem(initKey)
 
     let cancelled = false
     fetch(`${config.kratosUrl}/self-service/${kind}/flows?id=${encodeURIComponent(flowId)}`, {
@@ -82,13 +100,22 @@ export function KratosFlow({ kind }: { kind: FlowKind }) {
       headers: { Accept: 'application/json' },
     })
       .then(async (res) => {
-        // 404/410/403 → the flow is gone or expired; start over.
+        // 404/410/403 → flow gone/expired, or (most often) the CSRF cookie didn't
+        // ride along on this cross-site XHR. Re-initialize AT MOST ONCE, then stop
+        // and explain — never loop forever swapping flow ids.
         if (res.status === 404 || res.status === 410 || res.status === 403) {
+          if (sessionStorage.getItem(retryKey)) {
+            sessionStorage.removeItem(retryKey)
+            if (!cancelled) setError(COOKIE_HINT)
+            return
+          }
+          sessionStorage.setItem(retryKey, '1')
           window.location.href = browserInitUrl(kind)
           return
         }
         if (!res.ok) throw new Error(`flow ${res.status}`)
         const data = (await res.json()) as KratosFlow
+        sessionStorage.removeItem(retryKey)
         if (!cancelled) setFlow(data)
       })
       .catch((e) => {
