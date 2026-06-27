@@ -62,6 +62,7 @@ import type {
   PropsWithChildren,
   ReactNode,
   RefObject,
+  SyntheticEvent,
 } from "react";
 import {
   Children,
@@ -421,7 +422,7 @@ export const PromptInputActionAddAttachments = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    (e: Event) => {
+    (e: SyntheticEvent<HTMLDivElement>) => {
       e.preventDefault();
       attachments.openFileDialog();
     },
@@ -449,7 +450,8 @@ export const PromptInputActionAddScreenshot = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    async (event: Event) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (event: any) => {
       onSelect?.(event);
       if (event.defaultPrevented) {
         return;
@@ -1232,13 +1234,13 @@ export const PromptInputSubmit = ({
   }
 
   const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
+    (e: React.MouseEvent<HTMLButtonElement> & { preventBaseUIHandler?: () => void }) => {
       if (isGenerating && onStop) {
         e.preventDefault();
         onStop();
         return;
       }
-      onClick?.(e);
+      onClick?.(e as Parameters<NonNullable<typeof onClick>>[0]);
     },
     [isGenerating, onStop, onClick]
   );
@@ -1314,11 +1316,9 @@ export const PromptInputSelectValue = ({
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
 
 export const PromptInputHoverCard = ({
-  openDelay = 0,
-  closeDelay = 0,
   ...props
 }: PromptInputHoverCardProps) => (
-  <HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
+  <HoverCard {...props} />
 );
 
 export type PromptInputHoverCardTriggerProps = ComponentProps<
