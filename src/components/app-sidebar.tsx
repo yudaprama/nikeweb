@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, ChevronsUpDown, Check, Sun, Moon, Sparkles, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import {
@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useSession, useLogout } from '@/lib/auth'
 import { useWorkspaces, useCreateWorkspace } from '@/lib/workspaces'
-import { useActiveWorkspaceId, setActiveWorkspace } from '@/lib/active-workspace'
+import { useActiveWorkspaceId, setActiveWorkspace, isWorkspaceChosen } from '@/lib/active-workspace'
 import { NAV_ITEMS, type View } from '@/lib/views'
 
 interface AppSidebarProps {
@@ -67,6 +67,16 @@ export function AppSidebar({
     const name = window.prompt('Workspace name')?.trim()
     if (name) createWorkspace.mutate(name)
   }
+
+  // Workspace-first: land a user with no explicit choice in their first
+  // workspace (the default one provisioned at registration). Fires once — after
+  // it sets the active workspace, `isWorkspaceChosen()` is true and it won't
+  // re-snap if the user later picks "Personal".
+  useEffect(() => {
+    if (!isWorkspaceChosen() && workspaces && workspaces.length > 0) {
+      setActiveWorkspace(workspaces[0].id)
+    }
+  }, [workspaces])
 
   const handleLogout = () => {
     setSigningOut(true)
