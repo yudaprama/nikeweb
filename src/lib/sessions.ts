@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { prest } from './prest'
 import { newId } from './ids'
+import { useActiveWorkspaceId } from './active-workspace'
 import type { Session } from './types'
 
 const TABLE = 'sessions'
 
 export function useSessions() {
+  // Keyed by the active workspace so switching refetches the scoped list.
+  const workspaceId = useActiveWorkspaceId()
   return useQuery({
-    queryKey: ['sessions'],
+    queryKey: ['sessions', workspaceId],
     queryFn: () => prest.list<Session>(TABLE, '_order=-updated_at&_page_size=100'),
   })
 }

@@ -24,6 +24,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useSession } from '@/lib/auth'
+import { useWorkspaces, useCreateWorkspace } from '@/lib/workspaces'
+import { useActiveWorkspaceId, setActiveWorkspace } from '@/lib/active-workspace'
 import { NAV_ITEMS, type View } from '@/lib/views'
 
 interface AppSidebarProps {
@@ -32,12 +34,6 @@ interface AppSidebarProps {
   onNewConversation: () => void
   creatingConversation?: boolean
 }
-
-// Static workspaces — no backend wiring yet (single-workspace OSS).
-const WORKSPACES = [
-  { id: 'personal', name: 'Personal', hint: 'Default workspace' },
-  { id: 'research', name: 'Research', hint: 'Reading & notes' },
-]
 
 // Placeholder balance — billing balance has no read endpoint wired yet.
 const BALANCE = 6.2
@@ -56,7 +52,17 @@ export function AppSidebar({
     (session?.identity?.traits as { email?: string } | undefined)?.email ?? 'you@example.com'
   const initials = email.slice(0, 2).toUpperCase()
   const needsApproval = false // tasks badge placeholder
-  const activeWs = WORKSPACES[0]
+  const { data: workspaces } = useWorkspaces()
+  const activeWsId = useActiveWorkspaceId()
+  const createWorkspace = useCreateWorkspace()
+  const activeName = activeWsId
+    ? (workspaces?.find((w) => w.id === activeWsId)?.name ?? 'Workspace')
+    : 'Personal'
+
+  const handleNewWorkspace = () => {
+    const name = window.prompt('Workspace name')?.trim()
+    if (name) createWorkspace.mutate(name)
+  }
 
   return (
     <Sidebar>
@@ -74,8 +80,10 @@ export function AppSidebar({
               <Sparkles className="size-4" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{activeWs.name}</span>
-              <span className="text-muted-foreground truncate text-xs">{activeWs.hint}</span>
+              <span className="truncate font-medium">{activeName}</span>
+              <span className="text-muted-foreground truncate text-xs">
+                {activeWsId ? 'Workspace' : 'Personal scope'}
+              </span>
             </div>
             <ChevronsUpDown className="ml-auto size-4" />
           </DropdownMenuTrigger>
@@ -86,14 +94,22 @@ export function AppSidebar({
             <DropdownMenuLabel className="text-muted-foreground text-xs">
               Workspaces
             </DropdownMenuLabel>
-            {WORKSPACES.map((ws) => (
-              <DropdownMenuItem key={ws.id} className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={() => setActiveWorkspace(null)}>
+              <span className="flex-1">Personal</span>
+              {activeWsId === null && <Check className="size-4" />}
+            </DropdownMenuItem>
+            {workspaces?.map((ws) => (
+              <DropdownMenuItem
+                key={ws.id}
+                className="gap-2"
+                onClick={() => setActiveWorkspace(ws.id)}
+              >
                 <span className="flex-1">{ws.name}</span>
-                {ws.id === activeWs.id && <Check className="size-4" />}
+                {ws.id === activeWsId && <Check className="size-4" />}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={handleNewWorkspace}>
               <Plus className="size-4" />
               New workspace
             </DropdownMenuItem>
