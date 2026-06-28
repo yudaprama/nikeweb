@@ -8,11 +8,23 @@ import { newId } from './ids'
  * pREST from the Oathkeeper identity header (never sent by the client); the
  * client only mints the primary key (`msg_…`).
  */
+/** A persisted tool invocation part (the AI-SDK `tool-<name>` shape). */
+export interface PersistedToolPart {
+  type: string
+  state?: string
+  input?: unknown
+  output?: unknown
+  errorText?: string
+}
+
 export interface MessageRow {
   id: string
   role: string
   content: string | null
   session_id?: string | null
+  // jsonb columns — rehydrated into message.parts on reload.
+  reasoning?: string | null
+  tools?: PersistedToolPart[] | null
   created_at?: string
 }
 
@@ -37,11 +49,16 @@ export async function saveMessage(input: {
   role: 'user' | 'assistant'
   content: string
   sessionId: string
+  reasoning?: string
+  tools?: PersistedToolPart[]
 }): Promise<void> {
   await prest.insert('messages', {
     id: newId('messages'),
     role: input.role,
     content: input.content,
     session_id: input.sessionId,
+    // Only send jsonb columns when present so user turns stay lean.
+    ...(input.reasoning ? { reasoning: input.reasoning } : {}),
+    ...(input.tools && input.tools.length > 0 ? { tools: input.tools } : {}),
   })
 }

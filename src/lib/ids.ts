@@ -12,6 +12,7 @@ const PREFIX = {
   sessions: 'ssn',
   messages: 'msg',
   topics: 'tpc',
+  agents: 'agt',
 } as const
 
 export function newId(kind: keyof typeof PREFIX): string {

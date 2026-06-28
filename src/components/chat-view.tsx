@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
 import type { UIMessage } from 'ai'
 import { PlanoChatTransport } from '@/lib/plano-transport'
-import { useMessages, saveMessage, type MessageRow } from '@/lib/messages'
+import { useMessages, saveMessage, type MessageRow, type PersistedToolPart } from '@/lib/messages'
 import {
   Conversation,
   ConversationContent,
@@ -45,13 +45,47 @@ function textOf(message: { parts: Array<{ type: string; text?: string }> }): str
     .join('')
 }
 
-/** pREST rows → AI-SDK UI messages for seeding the thread. */
+/** Concatenates the reasoning parts of a UI message (empty if none). */
+function reasoningOf(message: { parts: Array<{ type: string; text?: string }> }): string {
+  return message.parts
+    .filter((p) => p.type === 'reasoning')
+    .map((p) => p.text ?? '')
+    .join('')
+}
+
+/** Extracts the tool-invocation parts of a UI message for persistence. */
+function toolsOf(message: { parts: Array<{ type: string }> }): PersistedToolPart[] {
+  return message.parts
+    .filter((p) => p.type.startsWith('tool-'))
+    .map((p) => {
+      const tp = p as PersistedToolPart
+      return {
+        type: tp.type,
+        state: tp.state,
+        input: tp.input,
+        output: tp.output,
+        errorText: tp.errorText,
+      }
+    })
+}
+
+/** pREST rows → AI-SDK UI messages for seeding the thread. Rehydrates the
+ * persisted reasoning + tool parts so reloaded conversations show them. */
 function toUIMessages(rows: MessageRow[]): UIMessage[] {
-  return rows.map((r) => ({
-    id: r.id,
-    role: r.role === 'assistant' ? 'assistant' : r.role === 'system' ? 'system' : 'user',
-    parts: [{ type: 'text' as const, text: r.content ?? '' }],
-  }))
+  return rows.map((r) => {
+    const parts: UIMessage['parts'] = [{ type: 'text', text: r.content ?? '' }]
+    if (r.reasoning) {
+      parts.push({ type: 'reasoning', text: r.reasoning } as UIMessage['parts'][number])
+    }
+    for (const t of r.tools ?? []) {
+      parts.push(t as unknown as UIMessage['parts'][number])
+    }
+    return {
+      id: r.id,
+      role: r.role === 'assistant' ? 'assistant' : r.role === 'system' ? 'system' : 'user',
+      parts,
+    }
+  })
 }
 
 /**
@@ -95,9 +129,13 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
     onFinish: ({ message }) => {
       const text = textOf(message)
       if (message.role === 'assistant' && text) {
-        void saveMessage({ role: 'assistant', content: text, sessionId }).catch((e) =>
-          console.error('persist assistant message failed', e),
-        )
+        void saveMessage({
+          role: 'assistant',
+          content: text,
+          sessionId,
+          reasoning: reasoningOf(message) || undefined,
+          tools: toolsOf(message),
+        }).catch((e) => console.error('persist assistant message failed', e))
       }
     },
   })

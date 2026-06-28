@@ -1,6 +1,8 @@
-import { Plus } from 'lucide-react'
+import { Plus, Trash2, LogOut } from 'lucide-react'
+import { toast } from 'sonner'
 import { ViewHeader } from '@/components/view-header'
 import { KeysPanel } from '@/components/keys-panel'
+import { WorkspaceMembersPanel } from '@/components/workspace-members-panel'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -8,6 +10,14 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  useWorkspaces,
+  useCreateWorkspace,
+  useDeleteWorkspace,
+  useLeaveWorkspace,
+} from '@/lib/workspaces'
+import { useActiveWorkspaceId, setActiveWorkspace } from '@/lib/active-workspace'
+import { useBalance, formatMicros } from '@/lib/billing'
 
 const USAGE_BARS = [
   { name: 'Sage Pro', amount: '$12.40', pct: 66 },
@@ -22,13 +32,114 @@ const CHARGES = [
   { label: 'Top-up', when: 'Apr 2', amount: '+$25.00' },
 ]
 
-const WORKSPACES = [
-  { id: 'personal', name: 'Personal', meta: '12 conversations · just you', active: true },
-  { id: 'research', name: 'Research', meta: '2 conversations · just you', active: false },
-  { id: 'side', name: 'Side project', meta: '2 conversations · just you', active: false },
-]
+function WorkspacesTab() {
+  const { data: workspaces, isLoading } = useWorkspaces()
+  const activeWsId = useActiveWorkspaceId()
+  const createWorkspace = useCreateWorkspace()
+  const deleteWorkspace = useDeleteWorkspace()
+  const leaveWorkspace = useLeaveWorkspace()
+
+  const handleNew = () => {
+    const name = window.prompt('Workspace name')?.trim()
+    if (name) createWorkspace.mutate(name)
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <p className="text-muted-foreground max-w-sm text-sm">
+          Switch the active workspace, create a new one, or manage members.
+        </p>
+        <Button size="sm" className="shrink-0 gap-2" onClick={handleNew} disabled={createWorkspace.isPending}>
+          <Plus className="size-4" />
+          New workspace
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {/* Personal scope is always available (workspace_id IS NULL). */}
+        <Card className={activeWsId === null ? 'border-primary' : undefined}>
+          <CardContent className="flex items-center gap-3 px-4">
+            <div className="bg-muted size-10 shrink-0 rounded-lg" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">Personal</div>
+              <div className="text-muted-foreground text-xs">Just you · no workspace</div>
+            </div>
+            {activeWsId === null ? (
+              <Badge>Active</Badge>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setActiveWorkspace(null)}>
+                Switch
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {isLoading && <p className="text-muted-foreground text-sm">Loading workspaces…</p>}
+
+        {workspaces?.map((ws) => {
+          const active = ws.id === activeWsId
+          return (
+            <Card key={ws.id} className={active ? 'border-primary' : undefined}>
+              <CardContent className="flex flex-col gap-3 px-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-muted size-10 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">{ws.name}</div>
+                    <div className="text-muted-foreground font-mono text-xs">{ws.id}</div>
+                  </div>
+                  {active ? <Badge>Active</Badge> : (
+                    <Button variant="outline" size="sm" onClick={() => setActiveWorkspace(ws.id)}>
+                      Switch
+                    </Button>
+                  )}
+                </div>
+
+                {active && (
+                  <>
+                    <Separator />
+                    <WorkspaceMembersPanel workspaceId={ws.id} />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => leaveWorkspace.mutate(ws.id, {
+                          onError: () => toast.error('Could not leave (sole owners must delete)'),
+                        })}
+                      >
+                        <LogOut className="size-4" />
+                        Leave
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive gap-1.5"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${ws.name}"? This cannot be undone.`)) {
+                            deleteWorkspace.mutate(ws.id, {
+                              onError: () => toast.error('Could not delete workspace'),
+                            })
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    </>
+  )
+}
 
 export function SettingsView() {
+  const { data: balance } = useBalance()
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ViewHeader title="Settings" />
@@ -50,7 +161,9 @@ export function SettingsView() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="font-mono text-2xl font-medium">$6.20</div>
+                    <div className="font-mono text-2xl font-medium">
+                      {balance ? formatMicros(balance.remainingMicros) : '—'}
+                    </div>
                     <Button size="sm" className="mt-3 w-full">
                       Add funds
                     </Button>
@@ -110,36 +223,7 @@ export function SettingsView() {
             </TabsContent>
 
             <TabsContent value="workspaces">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <p className="text-muted-foreground max-w-sm text-sm">
-                  Switch the active workspace or create a new one. Member roles &amp; permissions are
-                  coming soon.
-                </p>
-                <Button size="sm" className="shrink-0 gap-2">
-                  <Plus className="size-4" />
-                  New workspace
-                </Button>
-              </div>
-              <div className="flex flex-col gap-3">
-                {WORKSPACES.map((ws) => (
-                  <Card key={ws.id} className={ws.active ? 'border-primary' : undefined}>
-                    <CardContent className="flex items-center gap-3 px-4">
-                      <div className="bg-muted size-10 shrink-0 rounded-lg" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold">{ws.name}</div>
-                        <div className="text-muted-foreground text-xs">{ws.meta}</div>
-                      </div>
-                      {ws.active ? (
-                        <Badge>Active</Badge>
-                      ) : (
-                        <Button variant="outline" size="sm">
-                          Switch
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <WorkspacesTab />
             </TabsContent>
           </Tabs>
         </div>

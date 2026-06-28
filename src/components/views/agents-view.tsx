@@ -1,27 +1,27 @@
-import { useState } from 'react'
-import { Plus, Search, Calendar, Mail, Globe, FileText } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Search, Calendar, Mail, Globe, FileText, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { ViewHeader } from '@/components/view-header'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import {
+  useAgents,
+  useCreateAgent,
+  useUpdateAgent,
+  useDeleteAgent,
+  type AgentRow,
+} from '@/lib/agents'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <div className="mb-2 block text-sm font-semibold">{children}</div>
-}
-
-interface Agent {
-  id: string
-  name: string
-  subtitle: string
-  initials: string
-  model: string
-  persona: string
-  tools: Record<string, boolean>
 }
 
 const TOOL_META: { key: string; name: string; desc: string; icon: LucideIcon }[] = [
@@ -38,47 +38,97 @@ const MODELS = [
   { id: 'sage-reason', name: 'Sage Reason', price: '$8 / Mtok' },
 ]
 
-const INITIAL_AGENTS: Agent[] = [
-  {
-    id: 'ag1',
-    name: 'Sage',
-    subtitle: 'General assistant',
-    initials: 'S',
-    model: 'sage-pro',
-    persona:
-      'You are Sage, a calm and precise personal assistant. Lead with the answer, keep it concise, and ask before any irreversible or external action.',
-    tools: { search_knowledge: true, calendar: true, email: true, web: true, files: false },
-  },
-  {
-    id: 'ag2',
-    name: 'Scout',
-    subtitle: 'Research & reading',
-    initials: 'Sc',
-    model: 'sage-pro',
-    persona:
-      'You are Scout, a research assistant. Always cite sources, prefer primary literature, and summarize before going deep.',
-    tools: { search_knowledge: true, calendar: false, email: false, web: true, files: true },
-  },
-  {
-    id: 'ag3',
-    name: 'Ledger',
-    subtitle: 'Ops & errands',
-    initials: 'L',
-    model: 'sage-mini',
-    persona:
-      'You are Ledger, an operations agent for errands and admin. Be meticulous and always confirm before spending money or sending messages.',
-    tools: { search_knowledge: false, calendar: true, email: true, web: false, files: false },
-  },
-]
+function initialsOf(name: string): string {
+  return name.slice(0, 2) || 'A'
+}
+
+interface Draft {
+  name: string
+  persona: string
+  model: string
+  tools: Record<string, boolean>
+}
+
+function draftFromAgent(a: AgentRow): Draft {
+  return {
+    name: a.name,
+    persona: a.system_prompt ?? '',
+    model: a.model || 'sage-pro',
+    tools: (a.params?.tools as Record<string, boolean>) ?? {},
+  }
+}
 
 export function AgentsView() {
-  const [agents, setAgents] = useState(INITIAL_AGENTS)
-  const [activeId, setActiveId] = useState('ag1')
-  const agent = agents.find((a) => a.id === activeId) ?? agents[0]
-  const toolCount = Object.values(agent.tools).filter(Boolean).length
+  const { data: agents, isLoading } = useAgents()
+  const createAgent = useCreateAgent()
+  const updateAgent = useUpdateAgent()
+  const deleteAgent = useDeleteAgent()
 
-  const patch = (fn: (a: Agent) => Agent) =>
-    setAgents((prev) => prev.map((a) => (a.id === agent.id ? fn(a) : a)))
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
+
+  // Keep a selection in sync as agents load / change.
+  const active = agents?.find((a) => a.id === activeId) ?? null
+  useEffect(() => {
+    if (!agents || agents.length === 0) {
+      setActiveId(null)
+      setDraft(null)
+      return
+    }
+    if (!activeId || !agents.some((a) => a.id === activeId)) {
+      setActiveId(agents[0].id)
+      setDraft(draftFromAgent(agents[0]))
+    }
+  }, [agents, activeId])
+
+  const selectAgent = (a: AgentRow) => {
+    setActiveId(a.id)
+    setDraft(draftFromAgent(a))
+  }
+
+  const handleNew = async () => {
+    try {
+      const created = await createAgent.mutateAsync({
+        name: 'New agent',
+        system_prompt: 'You are a helpful assistant.',
+        model: 'sage-pro',
+        params: { tools: {} },
+      })
+      setActiveId(created.id)
+      setDraft(draftFromAgent(created))
+    } catch {
+      toast.error('Could not create agent')
+    }
+  }
+
+  const handleSave = async () => {
+    if (!active || !draft) return
+    try {
+      await updateAgent.mutateAsync({
+        id: active.id,
+        patch: {
+          name: draft.name,
+          system_prompt: draft.persona,
+          model: draft.model,
+          params: { tools: draft.tools },
+        },
+      })
+      toast.success('Agent saved')
+    } catch {
+      toast.error('Could not save agent')
+    }
+  }
+
+  const handleDelete = async (a: AgentRow) => {
+    if (!window.confirm(`Delete "${a.name}"?`)) return
+    try {
+      await deleteAgent.mutateAsync(a.id)
+    } catch {
+      toast.error('Could not delete agent')
+    }
+  }
+
+  const toolCount = draft ? Object.values(draft.tools).filter(Boolean).length : 0
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -90,106 +140,154 @@ export function AgentsView() {
             <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
               Agents
             </span>
-            <Button variant="ghost" size="icon" className="size-7" aria-label="New agent">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label="New agent"
+              onClick={handleNew}
+              disabled={createAgent.isPending}
+            >
               <Plus className="size-4" />
             </Button>
           </div>
           <ScrollArea className="flex-1">
             <div className="space-y-0.5 px-2 pb-3">
-              {agents.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => setActiveId(a.id)}
-                  className={cn(
-                    'hover:bg-accent flex w-full items-center gap-2.5 rounded-lg border border-transparent p-2 text-left transition-colors',
-                    a.id === activeId && 'bg-accent border-border',
-                  )}
-                >
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg text-xs">{a.initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{a.name}</div>
-                    <div className="text-muted-foreground truncate text-xs">{a.subtitle}</div>
-                  </div>
-                </button>
-              ))}
+              {isLoading ? (
+                <div className="space-y-2 p-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : !agents || agents.length === 0 ? (
+                <p className="text-muted-foreground px-2 py-6 text-center text-xs">
+                  No agents yet. Create one to get started.
+                </p>
+              ) : (
+                agents.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => selectAgent(a)}
+                    className={cn(
+                      'hover:bg-accent flex w-full items-center gap-2.5 rounded-lg border border-transparent p-2 text-left transition-colors',
+                      a.id === activeId && 'bg-accent border-border',
+                    )}
+                  >
+                    <Avatar className="size-8 rounded-lg">
+                      <AvatarFallback className="rounded-lg text-xs">
+                        {initialsOf(a.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{a.name}</div>
+                      <div className="text-muted-foreground truncate text-xs">
+                        {a.model || 'no model'}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </ScrollArea>
         </div>
 
         {/* detail */}
         <ScrollArea className="flex-1">
-          <div className="mx-auto max-w-2xl px-6 py-8">
-            <div className="mb-6 flex items-center gap-3">
-              <Avatar className="size-12 rounded-xl">
-                <AvatarFallback className="rounded-xl text-lg">{agent.initials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="text-lg font-semibold">{agent.name}</h2>
-                <p className="text-muted-foreground text-sm">{agent.subtitle}</p>
-              </div>
+          {!active || !draft ? (
+            <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+              Select or create an agent to configure it.
             </div>
-
-            <FieldLabel>Persona &amp; instructions</FieldLabel>
-            <Textarea
-              value={agent.persona}
-              onChange={(e) => patch((a) => ({ ...a, persona: e.target.value }))}
-              className="mb-6 min-h-24"
-            />
-
-            <FieldLabel>Model</FieldLabel>
-            <div className="mb-6 flex flex-col gap-2">
-              {MODELS.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => patch((a) => ({ ...a, model: m.id }))}
-                  className={cn(
-                    'hover:bg-accent flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
-                    agent.model === m.id && 'border-primary bg-accent',
-                  )}
+          ) : (
+            <div className="mx-auto max-w-2xl px-6 py-8">
+              <div className="mb-6 flex items-center gap-3">
+                <Avatar className="size-12 rounded-xl">
+                  <AvatarFallback className="rounded-xl text-lg">
+                    {initialsOf(draft.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <Input
+                    value={draft.name}
+                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="text-lg font-semibold"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label="Delete agent"
+                  onClick={() => handleDelete(active)}
                 >
-                  <span
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+
+              <FieldLabel>Persona &amp; instructions</FieldLabel>
+              <Textarea
+                value={draft.persona}
+                onChange={(e) => setDraft({ ...draft, persona: e.target.value })}
+                className="mb-6 min-h-24"
+              />
+
+              <FieldLabel>Model</FieldLabel>
+              <div className="mb-6 flex flex-col gap-2">
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setDraft({ ...draft, model: m.id })}
                     className={cn(
-                      'flex size-4 items-center justify-center rounded-full border-2',
-                      agent.model === m.id ? 'border-primary' : 'border-muted-foreground/40',
+                      'hover:bg-accent flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
+                      draft.model === m.id && 'border-primary bg-accent',
                     )}
                   >
-                    {agent.model === m.id && <span className="bg-primary size-2 rounded-full" />}
-                  </span>
-                  <span className="flex-1 text-sm font-medium">{m.name}</span>
-                  <span className="text-muted-foreground font-mono text-xs">{m.price}</span>
-                </button>
-              ))}
-            </div>
+                    <span
+                      className={cn(
+                        'flex size-4 items-center justify-center rounded-full border-2',
+                        draft.model === m.id ? 'border-primary' : 'border-muted-foreground/40',
+                      )}
+                    >
+                      {draft.model === m.id && <span className="bg-primary size-2 rounded-full" />}
+                    </span>
+                    <span className="flex-1 text-sm font-medium">{m.name}</span>
+                    <span className="text-muted-foreground font-mono text-xs">{m.price}</span>
+                  </button>
+                ))}
+              </div>
 
-            <FieldLabel>
-              Tools{' '}
-              <span className="text-muted-foreground font-normal">· {toolCount} enabled</span>
-            </FieldLabel>
-            <div className="overflow-hidden rounded-xl border">
-              {TOOL_META.map((t, i) => (
-                <div key={t.key}>
-                  {i > 0 && <Separator />}
-                  <div className="flex items-center gap-3 px-3 py-3">
-                    <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg">
-                      <t.icon className="size-4" />
+              <FieldLabel>
+                Tools{' '}
+                <span className="text-muted-foreground font-normal">· {toolCount} enabled</span>
+              </FieldLabel>
+              <div className="mb-6 overflow-hidden rounded-xl border">
+                {TOOL_META.map((t, i) => (
+                  <div key={t.key}>
+                    {i > 0 && <Separator />}
+                    <div className="flex items-center gap-3 px-3 py-3">
+                      <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg">
+                        <t.icon className="size-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium">{t.name}</div>
+                        <div className="text-muted-foreground text-xs">{t.desc}</div>
+                      </div>
+                      <Switch
+                        checked={!!draft.tools[t.key]}
+                        onCheckedChange={(v) =>
+                          setDraft({ ...draft, tools: { ...draft.tools, [t.key]: v } })
+                        }
+                      />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{t.name}</div>
-                      <div className="text-muted-foreground text-xs">{t.desc}</div>
-                    </div>
-                    <Switch
-                      checked={!!agent.tools[t.key]}
-                      onCheckedChange={(v) =>
-                        patch((a) => ({ ...a, tools: { ...a.tools, [t.key]: v } }))
-                      }
-                    />
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSave} disabled={updateAgent.isPending}>
+                  {updateAgent.isPending ? 'Saving…' : 'Save changes'}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </ScrollArea>
       </div>
     </div>

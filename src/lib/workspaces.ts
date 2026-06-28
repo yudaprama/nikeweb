@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { prest } from './prest'
 import { egent } from './egent'
-import { setActiveWorkspace } from './active-workspace'
+import { getActiveWorkspaceId, setActiveWorkspace } from './active-workspace'
 
 export interface Workspace {
   id: string
@@ -60,5 +60,42 @@ export function useAddMember() {
       egent.json('/v1/workspaces/members', { method: 'POST', body: JSON.stringify(p) }),
     onSuccess: (_d, p) =>
       qc.invalidateQueries({ queryKey: ['workspace-members', p.workspaceId] }),
+  })
+}
+
+/** Removes a member (owner-only; deletes the row + Keto tuples server-side). */
+export function useRemoveMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (p: { workspaceId: string; memberId: string }) =>
+      egent.json('/v1/workspaces/members/remove', { method: 'POST', body: JSON.stringify(p) }),
+    onSuccess: (_d, p) =>
+      qc.invalidateQueries({ queryKey: ['workspace-members', p.workspaceId] }),
+  })
+}
+
+/** Deletes a workspace (owner-only). Resets active scope if it was the deleted one. */
+export function useDeleteWorkspace() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) =>
+      egent.json('/v1/workspaces', { method: 'DELETE', body: JSON.stringify({ workspaceId }) }),
+    onSuccess: (_d, workspaceId) => {
+      if (getActiveWorkspaceId() === workspaceId) setActiveWorkspace(null)
+      qc.invalidateQueries({ queryKey: ['workspaces'] })
+    },
+  })
+}
+
+/** Leaves a workspace (self-remove). Resets active scope if it was the left one. */
+export function useLeaveWorkspace() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) =>
+      egent.json('/v1/workspaces/leave', { method: 'POST', body: JSON.stringify({ workspaceId }) }),
+    onSuccess: (_d, workspaceId) => {
+      if (getActiveWorkspaceId() === workspaceId) setActiveWorkspace(null)
+      qc.invalidateQueries({ queryKey: ['workspaces'] })
+    },
   })
 }

@@ -25,8 +25,18 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useSession, useLogout } from '@/lib/auth'
 import { useWorkspaces, useCreateWorkspace } from '@/lib/workspaces'
+import { useBalance, formatMicros } from '@/lib/billing'
 import { useActiveWorkspaceId, setActiveWorkspace, isWorkspaceChosen } from '@/lib/active-workspace'
 import { NAV_ITEMS, type View } from '@/lib/views'
 
@@ -36,10 +46,6 @@ interface AppSidebarProps {
   onNewConversation: () => void
   creatingConversation?: boolean
 }
-
-// Placeholder balance — billing balance has no read endpoint wired yet.
-const BALANCE = 6.2
-const BALANCE_CAP = 25
 
 export function AppSidebar({
   view,
@@ -57,15 +63,27 @@ export function AppSidebar({
   const initials = email.slice(0, 2).toUpperCase()
   const needsApproval = false // tasks badge placeholder
   const { data: workspaces } = useWorkspaces()
+  const { data: balance } = useBalance()
   const activeWsId = useActiveWorkspaceId()
   const createWorkspace = useCreateWorkspace()
   const activeName = activeWsId
     ? (workspaces?.find((w) => w.id === activeWsId)?.name ?? 'Workspace')
     : 'Personal'
 
+  // Balance: micros from Talos. quotaMicros 0 = unlimited (no cap bar).
+  const remaining = balance?.remainingMicros ?? 0
+  const quota = balance?.quotaMicros ?? 0
+  const balancePct = quota > 0 ? Math.max(0, Math.min(100, (remaining / quota) * 100)) : 100
+
+  const [newWsOpen, setNewWsOpen] = useState(false)
+  const [newWsName, setNewWsName] = useState('')
+
   const handleNewWorkspace = () => {
-    const name = window.prompt('Workspace name')?.trim()
-    if (name) createWorkspace.mutate(name)
+    const name = newWsName.trim()
+    if (!name) return
+    createWorkspace.mutate(name)
+    setNewWsName('')
+    setNewWsOpen(false)
   }
 
   // Workspace-first: land a user with no explicit choice in their first
@@ -130,7 +148,7 @@ export function AppSidebar({
               ))}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2" onClick={handleNewWorkspace}>
+            <DropdownMenuItem className="gap-2" onClick={() => setNewWsOpen(true)}>
               <Plus className="size-4" />
               New workspace
             </DropdownMenuItem>
@@ -175,10 +193,10 @@ export function AppSidebar({
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-muted-foreground text-xs">Balance</span>
             <span className="font-mono text-xs font-medium tabular-nums">
-              ${BALANCE.toFixed(2)}
+              {balance ? formatMicros(remaining) : '—'}
             </span>
           </div>
-          <Progress value={(BALANCE / BALANCE_CAP) * 100} />
+          <Progress value={balancePct} />
           <Button variant="outline" size="sm" className="mt-2 w-full">
             Add funds
           </Button>
@@ -230,6 +248,34 @@ export function AppSidebar({
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
+
+      <Dialog open={newWsOpen} onOpenChange={setNewWsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New workspace</DialogTitle>
+            <DialogDescription>
+              Workspaces keep conversations, knowledge, and members separate.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={newWsName}
+            onChange={(e) => setNewWsName(e.target.value)}
+            placeholder="Workspace name"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleNewWorkspace()
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewWsOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleNewWorkspace} disabled={!newWsName.trim() || createWorkspace.isPending}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   )
 }
