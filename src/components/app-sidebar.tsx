@@ -1,4 +1,5 @@
-import { Plus, ChevronsUpDown, Check, Sun, Moon, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, ChevronsUpDown, Check, Sun, Moon, Sparkles, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import {
   Sidebar,
@@ -23,7 +24,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { useSession } from '@/lib/auth'
+import { useSession, useLogout } from '@/lib/auth'
 import { useWorkspaces, useCreateWorkspace } from '@/lib/workspaces'
 import { useActiveWorkspaceId, setActiveWorkspace } from '@/lib/active-workspace'
 import { NAV_ITEMS, type View } from '@/lib/views'
@@ -47,6 +48,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { theme, setTheme } = useTheme()
   const { data: session } = useSession()
+  const logout = useLogout()
+  const [signingOut, setSigningOut] = useState(false)
 
   const email =
     (session?.identity?.traits as { email?: string } | undefined)?.email ?? 'you@example.com'
@@ -62,6 +65,11 @@ export function AppSidebar({
   const handleNewWorkspace = () => {
     const name = window.prompt('Workspace name')?.trim()
     if (name) createWorkspace.mutate(name)
+  }
+
+  const handleLogout = () => {
+    setSigningOut(true)
+    void logout()
   }
 
   return (
@@ -163,23 +171,49 @@ export function AppSidebar({
           </Button>
         </div>
 
-        <div className="flex items-center gap-2 px-1">
-          <Avatar className="size-8 rounded-lg">
-            <AvatarFallback className="rounded-lg text-xs">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="text-muted-foreground truncate text-xs">{email}</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            aria-label="Toggle theme"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                disabled={signingOut}
+                className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left outline-none data-[state=open]:bg-sidebar-accent"
+              />
+            }
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </Button>
-        </div>
+            <Avatar className="size-8 rounded-lg">
+              <AvatarFallback className="rounded-lg text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-sm leading-tight">
+              <span className="text-muted-foreground truncate text-xs">{email}</span>
+            </div>
+            <ChevronsUpDown className="ml-auto size-4 opacity-60" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="end"
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
+          >
+            <DropdownMenuLabel className="text-muted-foreground text-xs truncate">
+              {email}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 text-destructive focus:text-destructive"
+              disabled={signingOut}
+              onClick={handleLogout}
+            >
+              <LogOut className="size-4" />
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   )
