@@ -86,15 +86,23 @@ export function AppSidebar({
     setNewWsOpen(false)
   }
 
-  // Workspace-first: land a user with no explicit choice in their first
-  // workspace (the default one provisioned at registration). Fires once — after
-  // it sets the active workspace, `isWorkspaceChosen()` is true and it won't
-  // re-snap if the user later picks "Personal".
+  // Keep the active workspace valid against the user's real membership list.
+  //  1. Stale/orphan active id (workspace deleted, or not a member) → reset to
+  //     personal. Without this the client keeps sending a phantom X-Workspace-Id
+  //     and the edge gate 403s EVERY workspace-scoped read.
+  //  2. Workspace-first: a user with no explicit choice lands in their first
+  //     workspace (provisioned at registration). Fires once — afterwards
+  //     `isWorkspaceChosen()` is true so it won't re-snap if they pick Personal.
   useEffect(() => {
-    if (!isWorkspaceChosen() && workspaces && workspaces.length > 0) {
+    if (!workspaces) return // undefined while loading / on error — don't touch
+    if (activeWsId && !workspaces.some((w) => w.id === activeWsId)) {
+      setActiveWorkspace(null)
+      return
+    }
+    if (!isWorkspaceChosen() && workspaces.length > 0) {
       setActiveWorkspace(workspaces[0].id)
     }
-  }, [workspaces])
+  }, [workspaces, activeWsId])
 
   const handleLogout = () => {
     setSigningOut(true)
