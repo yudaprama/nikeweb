@@ -16,6 +16,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -99,23 +100,25 @@ export function AppSidebar({
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
             align="start"
           >
-            <DropdownMenuLabel className="text-muted-foreground text-xs">
-              Workspaces
-            </DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2" onClick={() => setActiveWorkspace(null)}>
-              <span className="flex-1">Personal</span>
-              {activeWsId === null && <Check className="size-4" />}
-            </DropdownMenuItem>
-            {workspaces?.map((ws) => (
-              <DropdownMenuItem
-                key={ws.id}
-                className="gap-2"
-                onClick={() => setActiveWorkspace(ws.id)}
-              >
-                <span className="flex-1">{ws.name}</span>
-                {ws.id === activeWsId && <Check className="size-4" />}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-muted-foreground text-xs">
+                Workspaces
+              </DropdownMenuLabel>
+              <DropdownMenuItem className="gap-2" onClick={() => setActiveWorkspace(null)}>
+                <span className="flex-1">Personal</span>
+                {activeWsId === null && <Check className="size-4" />}
               </DropdownMenuItem>
-            ))}
+              {workspaces?.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  className="gap-2"
+                  onClick={() => setActiveWorkspace(ws.id)}
+                >
+                  <span className="flex-1">{ws.name}</span>
+                  {ws.id === activeWsId && <Check className="size-4" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2" onClick={handleNewWorkspace}>
               <Plus className="size-4" />
@@ -193,9 +196,11 @@ export function AppSidebar({
             align="end"
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
           >
-            <DropdownMenuLabel className="text-muted-foreground text-xs truncate">
-              {email}
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-muted-foreground text-xs truncate">
+                {email}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2"
