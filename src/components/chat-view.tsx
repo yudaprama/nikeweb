@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
+import type { UIMessage } from 'ai'
 import { PlanoChatTransport } from '@/lib/plano-transport'
+import { useMessages, saveMessage, type MessageRow } from '@/lib/messages'
 import {
   Conversation,
   ConversationContent,
@@ -35,19 +37,78 @@ interface ChatViewProps {
   model?: string
 }
 
+/** Concatenates the text parts of a UI message. */
+function textOf(message: { parts: Array<{ type: string; text?: string }> }): string {
+  return message.parts
+    .filter((p) => p.type === 'text')
+    .map((p) => p.text ?? '')
+    .join('')
+}
+
+/** pREST rows → AI-SDK UI messages for seeding the thread. */
+function toUIMessages(rows: MessageRow[]): UIMessage[] {
+  return rows.map((r) => ({
+    id: r.id,
+    role: r.role === 'assistant' ? 'assistant' : r.role === 'system' ? 'system' : 'user',
+    parts: [{ type: 'text' as const, text: r.content ?? '' }],
+  }))
+}
+
+/**
+ * Loads the persisted history for the session, then mounts the live thread once.
+ * ChatView is keyed by session in ChatPage, so this remounts per conversation.
+ */
 export function ChatView({ sessionId, model }: ChatViewProps) {
-  // Streams from Plano's OpenAI-compatible model proxy via the cookie edge
-  // (`/.plano/v1/chat/completions`). The transport translates Plano's OpenAI SSE
-  // into the AI-SDK UI-message stream this view renders. Identity is injected by
-  // the edge from the Kratos session cookie. The proxy is stateless, so history
-  // is sent each turn (messages are not persisted server-side yet — see plan).
+  const { data, isLoading } = useMessages(sessionId)
+
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+        Loading conversation…
+      </div>
+    )
+  }
+
+  return (
+    <ChatThread
+      sessionId={sessionId}
+      model={model}
+      initialMessages={toUIMessages(data ?? [])}
+    />
+  )
+}
+
+interface ChatThreadProps extends ChatViewProps {
+  initialMessages: UIMessage[]
+}
+
+function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
+  // Streams from Plano's OpenAI-compatible model proxy with the user's API key
+  // (see plano-transport). The proxy is stateless, so each completed turn is
+  // persisted to pREST (lib/messages) for reload — best-effort, never blocking.
   const transport = useMemo(() => new PlanoChatTransport({ model }), [model])
 
-  const { messages, sendMessage, status, stop } = useChat({ id: sessionId, transport })
+  const { messages, sendMessage, status, stop } = useChat({
+    id: sessionId,
+    transport,
+    messages: initialMessages,
+    onFinish: ({ message }) => {
+      const text = textOf(message)
+      if (message.role === 'assistant' && text) {
+        void saveMessage({ role: 'assistant', content: text, sessionId }).catch((e) =>
+          console.error('persist assistant message failed', e),
+        )
+      }
+    },
+  })
 
   const handleSubmit = (msg: PromptInputMessage) => {
-    if (!msg.text.trim()) return
-    sendMessage({ text: msg.text })
+    const text = msg.text.trim()
+    if (!text) return
+    void saveMessage({ role: 'user', content: text, sessionId }).catch((e) =>
+      console.error('persist user message failed', e),
+    )
+    sendMessage({ text })
   }
 
   return (

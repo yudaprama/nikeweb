@@ -6,7 +6,11 @@ import { config } from './config'
  * filters or bodies. Send X-Workspace-Id for content tables when a workspace
  * is active (the backend filters by active workspace).
  */
-const DB = 'prest'
+// pREST connection name (the first URL path segment), NOT a Postgres db name.
+// Must be 'lobehub' — that selects the registered lobehub connection AND matches
+// `filter.Database == "lobehub"` so pREST applies the user_id / workspace
+// read-scope and the write-side user_id injection.
+const DB = 'lobehub'
 const SCHEMA = 'public'
 
 function headers(workspaceId?: string): HeadersInit {

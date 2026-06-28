@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { prest } from './prest'
+import { newId } from './ids'
 import type { Session } from './types'
 
 const TABLE = 'sessions'
@@ -14,7 +15,10 @@ export function useSessions() {
 export function useCreateSession() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (title: string) => prest.insert<Session>(TABLE, { title }),
+    // pREST runs raw SQL (no Drizzle $defaultFn), so mint the id client-side.
+    // user_id + workspace_id are injected by pREST from the Oathkeeper identity.
+    mutationFn: (title: string) =>
+      prest.insert<Session>(TABLE, { id: newId('sessions'), title }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
   })
 }
