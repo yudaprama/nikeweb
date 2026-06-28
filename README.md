@@ -12,8 +12,9 @@ This is the from-scratch fallback frontend described in `../FRONTEND_FROM_SCRATC
 ## Develop
 ```bash
 bun install
-bun dev        # Vite dev server
-bun run build  # tsc -b && vite build  (see caveat below)
+bun dev              # Vite dev server
+bun run typecheck    # tsc -b --force (also runs as the first step of `build`)
+bun run build        # tsc -b && vite build
 ```
 
 ## Environment (`.env.local`)
@@ -37,11 +38,5 @@ sends `credentials: 'include'` on every backend call.
 - **Streaming transport:** `chat-view.tsx` uses the AI SDK `DefaultChatTransport` against
   `/v1/chat/send`. Confirm egent-lobehub's actual stream format and swap to `TextStreamChatTransport`
   or a custom transport if it isn't the AI SDK data-stream protocol.
-- **`tsc` typecheck:** `ai-elements@latest` components (e.g. `attachments`, `context`, `prompt-input`,
-  `voice-selector`) currently fail strict typecheck against the installed `base-ui` primitive versions
-  (`openDelay`/`closeDelay`/`preventBaseUIHandler` skew). The app **builds and runs** (Vite/esbuild
-  doesn't typecheck); to make `bun run build`'s `tsc -b` pass, align the base-ui/shadcn primitive
-  versions ai-elements expects, or prune the unused ai-elements components. App code under `src/lib`
-  and `src/components` (non-ai-elements) is clean.
 - Next: M2 (agents & knowledge), M3 (memory & tasks), M4 (usage/billing, API keys). See
   `../FRONTEND_FROM_SCRATCH_PROMPT.md`.
