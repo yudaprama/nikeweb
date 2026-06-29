@@ -35,7 +35,14 @@ export const egent = {
   /** Raw fetch for non-streaming JSON endpoints. */
   async json<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await egentFetch(path, init)
-    return (await res.json()) as T
+    // 204 No Content (or any empty body) cannot be parsed as JSON — return
+    // null so callers like useRevokeKey (which hits Talos's
+    // /v2alpha1/self/.../:revoke → google.protobuf.Empty → 204) work without
+    // a SyntaxError on res.json().
+    if (res.status === 204) return null as T
+    const text = await res.text()
+    if (!text) return null as T
+    return JSON.parse(text) as T
   },
   /** Endpoint used by the chat transport for streaming completions. */
   chatStreamUrl: `${config.edgeUrl}/v1/chat/send`,

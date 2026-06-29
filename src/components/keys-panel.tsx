@@ -46,8 +46,8 @@ export function KeysPanel() {
 
   const handleRevoke = async (k: ApiKeyInfo) => {
     try {
-      await revokeKey.mutateAsync(k.key_id)
-      if (activeKey?.keyId === k.key_id) clearActiveKey()
+      await revokeKey.mutateAsync(k.keyId)
+      if (activeKey?.keyId === k.keyId) clearActiveKey()
     } catch {
       toast.error('Could not revoke key')
     }
@@ -127,7 +127,7 @@ export function KeysPanel() {
           </p>
         ) : (
           keys.map((k, i) => (
-            <div key={k.key_id}>
+            <div key={k.keyId}>
               {i > 0 && <Separator />}
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg">
@@ -136,18 +136,18 @@ export function KeysPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     {k.name}
-                    {activeKey?.keyId === k.key_id && (
+                    {activeKey?.keyId === k.keyId && (
                       <Badge variant="secondary" className="text-[10px]">
                         Active
                       </Badge>
                     )}
                   </div>
                   <div className="text-muted-foreground font-mono text-xs">
-                    {k.key_id.slice(0, 8)}…
+                    {k.keyId.slice(0, 8)}…
                   </div>
                 </div>
                 <span className="text-muted-foreground hidden text-xs sm:inline">
-                  {formatDate(k.create_time)}
+                  {formatDate(k.createTime)}
                 </span>
                 <Button
                   variant="ghost"

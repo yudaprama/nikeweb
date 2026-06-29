@@ -4,23 +4,22 @@ import { egent } from './egent'
 
 /**
  * Per-user Plano API keys. The user mints their OWN key (bound to their identity
- * as the Talos actor) through the egent edge (cookie-authenticated), then the
- * chat sends it as `Authorization: Bearer <key>` directly to Plano's
- * CORS-enabled model proxy. A leaked key only spends that one user's quota.
+ * as the Talos actor) through the Talos self-service surface behind the
+ * Oathkeeper edge (cookie-authenticated), then the chat sends it as
+ * `Authorization: Bearer <key>` directly to Plano's CORS-enabled model proxy.
+ * A leaked key only spends that one user's quota.
+ *
+ * Endpoint layout (protojson output is camelCase, matching IssuedApiKey.*):
+ *   GET    /v2alpha1/self/issuedApiKeys                      → ListIssuedApiKeysResponse
+ *   POST   /v2alpha1/self/issuedApiKeys                      → IssueApiKeyResponse (201, secret shown once)
+ *   POST   /v2alpha1/self/issuedApiKeys/{key_id}:revoke      → Empty (204, no body)
  */
 export interface ApiKeyInfo {
-  key_id: string
-  name: string
-  actor_id: string
-  status: string
-  create_time: string
-  expire_time: string
-}
-
-interface IssuedKey {
   keyId: string
   name: string
-  secret: string
+  actorId: string
+  status: string
+  createTime: string
   expireTime: string
 }
 
@@ -28,7 +27,10 @@ interface IssuedKey {
 export function useKeys() {
   return useQuery({
     queryKey: ['api-keys'],
-    queryFn: () => egent.json<{ keys: ApiKeyInfo[] }>('/v1/keys').then((r) => r.keys ?? []),
+    queryFn: () =>
+      egent
+        .json<{ issuedApiKeys?: ApiKeyInfo[] }>('/v2alpha1/self/issuedApiKeys')
+        .then((r) => r.issuedApiKeys ?? []),
   })
 }
 
@@ -37,10 +39,20 @@ export function useCreateKey() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (name?: string) =>
-      egent.json<IssuedKey>('/v1/keys', {
-        method: 'POST',
-        body: JSON.stringify({ name: name || 'web-app' }),
-      }),
+      egent
+        .json<{ issuedApiKey: { keyId: string; name: string; expireTime: string }; secret: string }>(
+          '/v2alpha1/self/issuedApiKeys',
+          {
+            method: 'POST',
+            body: JSON.stringify({ name: name || 'web-app' }),
+          },
+        )
+        .then((r) => ({
+          keyId: r.issuedApiKey.keyId,
+          name: r.issuedApiKey.name,
+          secret: r.secret,
+          expireTime: r.issuedApiKey.expireTime,
+        })),
     onSuccess: (data) => {
       setActiveKey({ secret: data.secret, keyId: data.keyId, name: data.name })
       qc.invalidateQueries({ queryKey: ['api-keys'] })
@@ -52,8 +64,13 @@ export function useCreateKey() {
 export function useRevokeKey() {
   const qc = useQueryClient()
   return useMutation({
+    // keyId is in the path per the proto binding (body carries only reason).
+    // The 204 response has no body; we read .text() so res.json() does not throw.
     mutationFn: (keyId: string) =>
-      egent.json('/v1/keys/revoke', { method: 'POST', body: JSON.stringify({ keyId }) }),
+      egent.json(`/v2alpha1/self/issuedApiKeys/${encodeURIComponent(keyId)}:revoke`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'REVOCATION_REASON_UNSPECIFIED' }),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['api-keys'] }),
   })
 }
