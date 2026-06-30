@@ -3,11 +3,18 @@ import { config } from './config'
 import { clearActiveKey } from './keys'
 import { setActiveWorkspace } from './active-workspace'
 
+export interface KratosTraits {
+  email?: string
+  name?: string
+  username?: string
+  avatar?: string
+}
+
 export interface KratosSession {
   active: boolean
   identity?: {
     id: string
-    traits?: Record<string, unknown>
+    traits?: KratosTraits
   }
 }
 

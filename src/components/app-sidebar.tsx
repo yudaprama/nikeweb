@@ -66,11 +66,18 @@ export function AppSidebar({
   const [signingOut, setSigningOut] = useState(false)
 
   const traits = session?.identity?.traits as
-    | { email?: string; avatar?: string }
+    | { email?: string; name?: string; username?: string; avatar?: string }
     | undefined
   const email = traits?.email ?? 'you@example.com'
   const avatar = traits?.avatar
-  const initials = email.slice(0, 2).toUpperCase()
+  const displayName = traits?.name || traits?.username || email
+  const initials = (traits?.name || traits?.username || email)
+    .split(/[\s@_.-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
   const needsApproval = false // tasks badge placeholder
   const { data: workspaces } = useWorkspaces()
   const { data: balance } = useBalance()
@@ -230,10 +237,11 @@ export function AppSidebar({
             }
           >
             <Avatar className="size-8 rounded-lg">
-              {avatar && <AvatarImage src={avatar} alt={email} />}
+              {avatar && <AvatarImage src={avatar} alt={displayName} />}
               <AvatarFallback className="rounded-lg text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-sm leading-tight">
+              <span className="truncate font-medium">{displayName}</span>
               <span className="text-muted-foreground truncate text-xs">{email}</span>
             </div>
             <ChevronsUpDown className="ml-auto size-4 opacity-60" />
@@ -245,7 +253,7 @@ export function AppSidebar({
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-muted-foreground text-xs truncate">
-                {email}
+                {displayName}
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
