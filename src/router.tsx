@@ -35,16 +35,8 @@ export function useWorkspace() {
 }
 
 const rootRoute = createRootRoute({
-  component: RootLayout,
+  component: () => <Outlet />,
 })
-
-function RootLayout() {
-  return (
-    <LoginGate>
-      <Outlet />
-    </LoginGate>
-  )
-}
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -79,17 +71,19 @@ function AppLayout() {
   }
 
   return (
-    <WorkspaceContext.Provider value={{ activeId, setActiveId, model, setModel }}>
-      <SidebarProvider>
-        <AppSidebar
-          onNewConversation={handleNewConversation}
-          creatingConversation={createSession.isPending}
-        />
-        <SidebarInset className="h-dvh overflow-hidden">
-          <Outlet />
-        </SidebarInset>
-      </SidebarProvider>
-    </WorkspaceContext.Provider>
+    <LoginGate>
+      <WorkspaceContext.Provider value={{ activeId, setActiveId, model, setModel }}>
+        <SidebarProvider>
+          <AppSidebar
+            onNewConversation={handleNewConversation}
+            creatingConversation={createSession.isPending}
+          />
+          <SidebarInset className="h-dvh overflow-hidden">
+            <Outlet />
+          </SidebarInset>
+        </SidebarProvider>
+      </WorkspaceContext.Provider>
+    </LoginGate>
   )
 }
 
