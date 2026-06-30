@@ -3,6 +3,72 @@ import { prest } from './prest'
 import { config } from './config'
 import { getActiveWorkspaceId } from './active-workspace'
 
+export const FILEPROCESSOR_SUPPORTED_EXTENSIONS = [
+  'txt',
+  'md',
+  'markdown',
+  'json',
+  'xml',
+  'html',
+  'htm',
+  'css',
+  'js',
+  'ts',
+  'py',
+  'java',
+  'cpp',
+  'c',
+  'h',
+  'hpp',
+  'cs',
+  'php',
+  'rb',
+  'go',
+  'rs',
+  'sh',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'cfg',
+  'conf',
+  'log',
+  'csv',
+  'tsv',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'pptx',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'svg',
+  'bmp',
+  'tiff',
+  'mp4',
+  'mkv',
+  'avi',
+  'mov',
+  'wmv',
+  'flv',
+  'webm',
+  'm4v',
+  'mpeg',
+  'mpg',
+  '3gp',
+] as const
+
+export const KNOWLEDGE_UPLOAD_ACCEPT = FILEPROCESSOR_SUPPORTED_EXTENSIONS.map((ext) => `.${ext}`).join(',')
+
+export function isFileprocessorSupportedFile(file: File): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return ext ? FILEPROCESSOR_SUPPORTED_EXTENSIONS.includes(ext as (typeof FILEPROCESSOR_SUPPORTED_EXTENSIONS)[number]) : true
+}
+
 /**
  * Knowledge files for RAG. Listing + delete go through pREST (`files` table,
  * scoped to the user + active workspace by the edge). Upload goes to AList
@@ -37,6 +103,9 @@ export function useUploadFile() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (file: File) => {
+      if (!isFileprocessorSupportedFile(file)) {
+        throw new Error('Unsupported file type')
+      }
       // File-Path is URL-escaped and joined to the user's AList base path
       // (provisioned root mount "/"). As-Task=false → synchronous store; the
       // upload hook then ingests for RAG.

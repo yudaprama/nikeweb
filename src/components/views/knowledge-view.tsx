@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
-import { useFiles, useUploadFile, useDeleteFile, formatSize, type KnowledgeFile } from '@/lib/rag'
+import { useFiles, useUploadFile, useDeleteFile, formatSize, type KnowledgeFile, KNOWLEDGE_UPLOAD_ACCEPT } from '@/lib/rag'
 
 const APPS = [
   { id: 'gmail', name: 'Gmail', initial: 'M', tools: '4 tools', desc: 'Read, draft and send email — with approval.', on: true },
