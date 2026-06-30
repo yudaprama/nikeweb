@@ -5,6 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   useKeys,
   useCreateKey,
@@ -26,12 +35,17 @@ export function KeysPanel() {
   const activeKey = useActiveKey()
   const [newSecret, setNewSecret] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [name, setName] = useState('')
 
-  const handleCreate = async () => {
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
     try {
-      const issued = await createKey.mutateAsync(undefined)
+      const issued = await createKey.mutateAsync(name.trim() || undefined)
       setNewSecret(issued.secret)
       setCopied(false)
+      setDialogOpen(false)
+      setName('')
     } catch {
       toast.error('Could not create key')
     }
@@ -63,13 +77,48 @@ export function KeysPanel() {
         <Button
           size="sm"
           className="shrink-0 gap-2"
-          onClick={handleCreate}
-          disabled={createKey.isPending}
+          onClick={() => setDialogOpen(true)}
         >
           <Plus className="size-4" />
-          {createKey.isPending ? 'Creating…' : 'Create key'}
+          Create key
         </Button>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <form onSubmit={handleCreate}>
+            <DialogHeader>
+              <DialogTitle>Create API key</DialogTitle>
+              <DialogDescription>
+                Give the key a name so you can recognize it later. The secret is shown only
+                once after creation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                autoFocus
+                placeholder="web-app"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={64}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDialogOpen(false)}
+                disabled={createKey.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createKey.isPending}>
+                {createKey.isPending ? 'Creating…' : 'Create key'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* The freshly-minted secret, shown exactly once. */}
       {newSecret && (
