@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { Plus, ChevronsUpDown, Check, Sun, Moon, Sparkles, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import {
@@ -38,21 +39,25 @@ import { useSession, useLogout } from '@/lib/auth'
 import { useWorkspaces, useCreateWorkspace } from '@/lib/workspaces'
 import { useBalance, formatMicros } from '@/lib/billing'
 import { useActiveWorkspaceId, setActiveWorkspace, isWorkspaceChosen } from '@/lib/active-workspace'
-import { NAV_ITEMS, type View } from '@/lib/views'
+import { NAV_ITEMS, VIEW_PATHS, type View } from '@/lib/views'
 
 interface AppSidebarProps {
-  view: View
-  onView: (view: View) => void
   onNewConversation: () => void
   creatingConversation?: boolean
 }
 
+const VIEW_FROM_PATH: Record<string, View> = Object.fromEntries(
+  Object.entries(VIEW_PATHS).map(([view, path]) => [path, view as View]),
+)
+
 export function AppSidebar({
-  view,
-  onView,
   onNewConversation,
   creatingConversation,
 }: AppSidebarProps) {
+  const navigate = useNavigate()
+  const location = useRouterState({ select: (s) => s.location })
+  const currentPath = location.pathname
+  const view: View = VIEW_FROM_PATH[currentPath] ?? 'chat'
   const { theme, setTheme } = useTheme()
   const { data: session } = useSession()
   const logout = useLogout()
@@ -181,7 +186,7 @@ export function AppSidebar({
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
                     isActive={view === item.key}
-                    onClick={() => onView(item.key)}
+                    onClick={() => navigate({ to: VIEW_PATHS[item.key] })}
                   >
                     <item.icon className="size-4" />
                     <span>{item.label}</span>

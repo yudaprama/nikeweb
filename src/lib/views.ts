@@ -10,6 +10,15 @@ import {
 
 export type View = 'chat' | 'agents' | 'knowledge' | 'memory' | 'tasks' | 'settings'
 
+export const VIEW_PATHS: Record<View, string> = {
+  chat: '/',
+  agents: '/agents',
+  knowledge: '/knowledge',
+  memory: '/memory',
+  tasks: '/tasks',
+  settings: '/settings',
+}
+
 export interface NavItem {
   key: View
   label: string
