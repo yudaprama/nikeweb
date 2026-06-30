@@ -19,7 +19,7 @@ bun run build        # tsc -b && vite build
 
 ## Environment (`.env.local`)
 ```
-# Defaults point at the live hosts (see ../ARCHITECTURE.md). Override locally:
+# Defaults point at the live hosts (see ../CLAUDE.md). Override locally:
 VITE_EDGE_URL=https://backend.getkawai.com      # Oathkeeper edge (egent + pREST)
 VITE_MODEL_PROXY_URL=https://api.getkawai.com   # Plano model proxy (/v1/models)
 VITE_KRATOS_URL=https://backend.getkawai.com/.ory/kratos/public

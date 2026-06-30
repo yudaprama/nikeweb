@@ -17,7 +17,7 @@ import { getActiveApiKey } from './keys'
  *
  * The orchestrator is stateless, so the full conversation history is sent each
  * call. HITL/intervention surfacing is not supported on :8001 (headless) — see
- * EGENT_LOBEHUB_DISMANTLE_PLAN.md Step 3.
+ * docs/archive/EGENT_LOBEHUB_DISMANTLE_PLAN.md Step 3.
  */
 export class PlanoChatTransport implements ChatTransport<UIMessage> {
   private readonly opts: { model?: string }
