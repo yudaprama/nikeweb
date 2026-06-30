@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
-import { egent } from './egent'
+import { egent, EgentError } from './egent'
 
 /**
  * Per-user Plano API keys. The user mints their OWN key (bound to their identity
@@ -44,14 +44,22 @@ function mapKey(k: RawIssuedApiKey): ApiKeyInfo {
   }
 }
 
-/** Lists the signed-in user's API keys (secrets are never returned by list). */
+/**
+ * Lists the signed-in user's API keys (secrets are never returned by list).
+ * Talos returns revoked keys too; we only surface ACTIVE ones so the user
+ * can't click revoke on an already-dead key (which 409s).
+ */
 export function useKeys() {
   return useQuery({
     queryKey: ['api-keys'],
     queryFn: () =>
       egent
         .json<{ issued_api_keys?: RawIssuedApiKey[] }>('/v2alpha1/self/issuedApiKeys')
-        .then((r) => (r.issued_api_keys ?? []).map(mapKey)),
+        .then((r) =>
+          (r.issued_api_keys ?? [])
+            .filter((k) => k.status === 'KEY_STATUS_ACTIVE')
+            .map(mapKey),
+        ),
   })
 }
 
@@ -86,12 +94,19 @@ export function useRevokeKey() {
   const qc = useQueryClient()
   return useMutation({
     // keyId is in the path per the proto binding (body carries only reason).
-    // The 204 response has no body; we read .text() so res.json() does not throw.
-    mutationFn: (keyId: string) =>
-      egent.json(`/v2alpha1/self/issuedApiKeys/${encodeURIComponent(keyId)}:revoke`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: 'REVOCATION_REASON_UNSPECIFIED' }),
-      }),
+    // The 204 response has no body; egent.json returns null for it.
+    // A 409 means the key was already revoked — the end state we wanted, so
+    // treat it as success (the list refetch will drop it) instead of erroring.
+    mutationFn: async (keyId: string) => {
+      try {
+        await egent.json(`/v2alpha1/self/issuedApiKeys/${encodeURIComponent(keyId)}:revoke`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: 'REVOCATION_REASON_UNSPECIFIED' }),
+        })
+      } catch (err) {
+        if (!(err instanceof EgentError && err.status === 409)) throw err
+      }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['api-keys'] }),
   })
 }
