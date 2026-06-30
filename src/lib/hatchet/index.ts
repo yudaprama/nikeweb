@@ -3,6 +3,7 @@ export { statusColor } from './status'
 export {
   useWorkflowRuns,
   useWorkflowRun,
+  useTriggerWorkflow,
   useReplayRuns,
   type RunListOptions,
   type V1TaskSummary,

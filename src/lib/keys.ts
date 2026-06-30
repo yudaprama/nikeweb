@@ -9,7 +9,7 @@ import { egent } from './egent'
  * `Authorization: Bearer <key>` directly to Plano's CORS-enabled model proxy.
  * A leaked key only spends that one user's quota.
  *
- * Endpoint layout (protojson output is camelCase, matching IssuedApiKey.*):
+ * Endpoint layout (protojson output is snake_case, matching the proto field names):
  *   GET    /v2alpha1/self/issuedApiKeys                      → ListIssuedApiKeysResponse
  *   POST   /v2alpha1/self/issuedApiKeys                      → IssueApiKeyResponse (201, secret shown once)
  *   POST   /v2alpha1/self/issuedApiKeys/{key_id}:revoke      → Empty (204, no body)
@@ -23,14 +23,35 @@ export interface ApiKeyInfo {
   expireTime: string
 }
 
+/** Raw snake_case shape Talos emits (protojson with original field names). */
+interface RawIssuedApiKey {
+  key_id: string
+  name: string
+  actor_id: string
+  status: string
+  create_time: string
+  expire_time: string
+}
+
+function mapKey(k: RawIssuedApiKey): ApiKeyInfo {
+  return {
+    keyId: k.key_id,
+    name: k.name,
+    actorId: k.actor_id,
+    status: k.status,
+    createTime: k.create_time,
+    expireTime: k.expire_time,
+  }
+}
+
 /** Lists the signed-in user's API keys (secrets are never returned by list). */
 export function useKeys() {
   return useQuery({
     queryKey: ['api-keys'],
     queryFn: () =>
       egent
-        .json<{ issuedApiKeys?: ApiKeyInfo[] }>('/v2alpha1/self/issuedApiKeys')
-        .then((r) => r.issuedApiKeys ?? []),
+        .json<{ issued_api_keys?: RawIssuedApiKey[] }>('/v2alpha1/self/issuedApiKeys')
+        .then((r) => (r.issued_api_keys ?? []).map(mapKey)),
   })
 }
 
@@ -40,7 +61,7 @@ export function useCreateKey() {
   return useMutation({
     mutationFn: (name?: string) =>
       egent
-        .json<{ issuedApiKey: { keyId: string; name: string; expireTime: string }; secret: string }>(
+        .json<{ issued_api_key: RawIssuedApiKey; secret: string }>(
           '/v2alpha1/self/issuedApiKeys',
           {
             method: 'POST',
@@ -48,10 +69,10 @@ export function useCreateKey() {
           },
         )
         .then((r) => ({
-          keyId: r.issuedApiKey.keyId,
-          name: r.issuedApiKey.name,
+          keyId: r.issued_api_key.key_id,
+          name: r.issued_api_key.name,
           secret: r.secret,
-          expireTime: r.issuedApiKey.expireTime,
+          expireTime: r.issued_api_key.expire_time,
         })),
     onSuccess: (data) => {
       setActiveKey({ secret: data.secret, keyId: data.keyId, name: data.name })

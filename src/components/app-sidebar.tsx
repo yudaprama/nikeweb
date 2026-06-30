@@ -57,7 +57,9 @@ export function AppSidebar({
   const navigate = useNavigate()
   const location = useRouterState({ select: (s) => s.location })
   const currentPath = location.pathname
-  const view: View = VIEW_FROM_PATH[currentPath] ?? 'chat'
+  const view: View =
+    VIEW_FROM_PATH[currentPath] ??
+    (currentPath.startsWith('/settings') ? 'settings' : 'chat')
   const { theme, setTheme } = useTheme()
   const { data: session } = useSession()
   const logout = useLogout()

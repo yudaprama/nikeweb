@@ -54,6 +54,21 @@ export function useWorkflowRun(runId: string | null) {
   })
 }
 
+/** Trigger a registered workflow by name with a JSON input payload. */
+export function useTriggerWorkflow() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { workflowName: string; input?: object }) => {
+      const res = await hatchetApi.v1WorkflowRunCreate(tenantId(), {
+        workflowName: vars.workflowName,
+        input: vars.input ?? {},
+      })
+      return res.data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['hatchet', 'runs'] }),
+  })
+}
+
 /** Replay one or more runs/tasks by external id. */
 export function useReplayRuns() {
   const qc = useQueryClient()
