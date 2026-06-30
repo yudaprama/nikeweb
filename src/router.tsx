@@ -16,6 +16,7 @@ import { AgentsView } from '@/components/views/agents-view'
 import { KnowledgeView } from '@/components/views/knowledge-view'
 import { MemoryView } from '@/components/views/memory-view'
 import { TasksView } from '@/components/views/tasks-view'
+import { TaskRunView } from '@/components/views/task-run-view'
 import { SettingsView } from '@/components/views/settings-view'
 import { useCreateSession } from '@/lib/sessions'
 
@@ -129,6 +130,12 @@ const tasksRoute = createRoute({
   component: TasksView,
 })
 
+const taskRunRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/tasks/$run',
+  component: TaskRunView,
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/settings',
@@ -152,6 +159,7 @@ const routeTree = rootRoute.addChildren([
     knowledgeRoute,
     memoryRoute,
     tasksRoute,
+    taskRunRoute,
     settingsRoute,
   ]),
   catchAllRoute,
