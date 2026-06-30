@@ -23,6 +23,7 @@ import {
   WorkspacesTab,
 } from '@/components/views/settings-view'
 import { useCreateSession } from '@/lib/sessions'
+import { useEnsureApiKey } from '@/lib/keys'
 
 interface WorkspaceContextValue {
   activeId: string | null
@@ -61,6 +62,12 @@ const appLayoutRoute = createRoute({
   component: AppLayout,
 })
 
+/** Mints a first-run API key for fresh accounts; renders nothing. */
+function EnsureApiKey() {
+  useEnsureApiKey()
+  return null
+}
+
 function AppLayout() {
   const navigate = useNavigate()
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -77,6 +84,9 @@ function AppLayout() {
 
   return (
     <LoginGate>
+      {/* Inside the gate → only runs once a Kratos session exists, so the
+          self-service key query is never fired anonymously. */}
+      <EnsureApiKey />
       <WorkspaceContext.Provider value={{ activeId, setActiveId, model, setModel }}>
         <SidebarProvider>
           <AppSidebar

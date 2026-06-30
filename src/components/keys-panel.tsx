@@ -1,18 +1,18 @@
-import { useState } from 'react'
-import { Plus, KeyRound, Trash2, Copy, Check } from 'lucide-react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
+import { useState } from "react";
+import { Plus, KeyRound, Trash2, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   useKeys,
   useCreateKey,
@@ -28,61 +28,85 @@ import {
   useActiveKey,
   clearActiveKey,
   type ApiKeyInfo,
-} from '@/lib/keys'
+} from "@/lib/keys";
 
 function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+}
+
+// Protobuf Duration value → human label. 1 year is the project max (talos.yaml
+// max_ttl: 8760h); Talos forbids non-expiring keys.
+const TTL_OPTIONS = [
+  { value: "604800s", label: "7 days" },
+  { value: "2592000s", label: "30 days" },
+  { value: "7776000s", label: "90 days" },
+  { value: "31536000s", label: "1 year (max)" },
+] as const;
+
+function ttlLabel(value: string): string {
+  return TTL_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 export function KeysPanel() {
-  const { data: keys, isLoading, error } = useKeys()
-  const createKey = useCreateKey()
-  const revokeKey = useRevokeKey()
-  const activeKey = useActiveKey()
-  const [newSecret, setNewSecret] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [name, setName] = useState('')
+  const { data: keys, isLoading, error } = useKeys();
+  const createKey = useCreateKey();
+  const revokeKey = useRevokeKey();
+  const activeKey = useActiveKey();
+  const [newSecret, setNewSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [name, setName] = useState("");
   // Talos forbids non-expiring keys; the project max is 1 year, so that's the
   // closest to "never" and our default. Value is a protobuf Duration string.
-  const [ttl, setTtl] = useState('31536000s')
+  const [ttl, setTtl] = useState("31536000s");
+  const [cidrs, setCidrs] = useState("");
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+    // Accept comma / newline / space separated CIDRs.
+    const allowedCidrs = cidrs
+      .split(/[\s,]+/)
+      .map((c) => c.trim())
+      .filter(Boolean);
     try {
-      const issued = await createKey.mutateAsync({ name: name.trim() || undefined, ttl })
-      setNewSecret(issued.secret)
-      setCopied(false)
-      setDialogOpen(false)
-      setName('')
+      const issued = await createKey.mutateAsync({
+        name: name.trim() || undefined,
+        ttl,
+        allowedCidrs,
+      });
+      setNewSecret(issued.secret);
+      setCopied(false);
+      setDialogOpen(false);
+      setName("");
+      setCidrs("");
     } catch {
-      toast.error('Could not create key')
+      toast.error("Could not create key");
     }
-  }
+  };
 
   const handleCopy = async () => {
-    if (!newSecret) return
-    await navigator.clipboard.writeText(newSecret)
-    setCopied(true)
-    toast.success('Key copied')
-  }
+    if (!newSecret) return;
+    await navigator.clipboard.writeText(newSecret);
+    setCopied(true);
+    toast.success("Key copied");
+  };
 
   const handleRevoke = async (k: ApiKeyInfo) => {
     try {
-      await revokeKey.mutateAsync(k.keyId)
-      if (activeKey?.keyId === k.keyId) clearActiveKey()
+      await revokeKey.mutateAsync(k.keyId);
+      if (activeKey?.keyId === k.keyId) clearActiveKey();
     } catch {
-      toast.error('Could not revoke key')
+      toast.error("Could not revoke key");
     }
-  }
+  };
 
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-4">
         <p className="text-muted-foreground max-w-sm text-sm">
-          Generate a personal API key — the chat uses it to reach the model. Treat it like a
-          password; it only spends your own balance.
+          Generate a personal API key — the chat uses it to reach the model.
+          Treat it like a password; it only spends your own balance.
         </p>
         <Button
           size="sm"
@@ -100,8 +124,8 @@ export function KeysPanel() {
             <DialogHeader>
               <DialogTitle>Create API key</DialogTitle>
               <DialogDescription>
-                Name the key and pick how long it stays valid. The secret is shown only once
-                after creation.
+                Name the key and pick how long it stays valid. The secret is
+                shown only once after creation.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4">
@@ -119,17 +143,34 @@ export function KeysPanel() {
                 <label className="text-sm font-medium">Expires</label>
                 <Select value={ttl} onValueChange={(v) => v && setTtl(v)}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string) => ttlLabel(value)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="604800s">7 days</SelectItem>
-                    <SelectItem value="2592000s">30 days</SelectItem>
-                    <SelectItem value="7776000s">90 days</SelectItem>
-                    <SelectItem value="31536000s">1 year (max)</SelectItem>
+                    {TTL_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">
+                  IP restriction{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </label>
+                <Input
+                  placeholder="10.0.0.0/8, 2001:db8::/32"
+                  value={cidrs}
+                  onChange={(e) => setCidrs(e.target.value)}
+                />
                 <p className="text-muted-foreground text-xs">
-                  Talos doesn't allow non-expiring keys — 1 year is the project maximum.
+                  Comma-separated CIDR allowlist. Not enforced yet — coming
+                  soon; leave blank to allow all IPs.
                 </p>
               </div>
             </div>
@@ -143,7 +184,7 @@ export function KeysPanel() {
                 Cancel
               </Button>
               <Button type="submit" disabled={createKey.isPending}>
-                {createKey.isPending ? 'Creating…' : 'Create key'}
+                {createKey.isPending ? "Creating…" : "Create key"}
               </Button>
             </DialogFooter>
           </form>
@@ -153,14 +194,25 @@ export function KeysPanel() {
       {/* The freshly-minted secret, shown exactly once. */}
       {newSecret && (
         <div className="border-primary/40 bg-primary/5 mb-4 rounded-xl border p-4">
-          <div className="mb-2 text-sm font-medium">Copy your new key now — it won't be shown again.</div>
+          <div className="mb-2 text-sm font-medium">
+            Copy your new key now — it won't be shown again.
+          </div>
           <div className="flex items-center gap-2">
             <code className="bg-background min-w-0 flex-1 truncate rounded-md border px-2.5 py-1.5 font-mono text-xs">
               {newSecret}
             </code>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopy}>
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copied ? 'Copied' : 'Copy'}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              {copied ? "Copied" : "Copy"}
             </Button>
           </div>
           <button
@@ -177,10 +229,15 @@ export function KeysPanel() {
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Badge variant="secondary">Active</Badge>
           <span className="text-muted-foreground">
-            Chat uses <span className="font-medium">{activeKey.name}</span> ·{' '}
+            Chat uses <span className="font-medium">{activeKey.name}</span> ·{" "}
             <span className="font-mono">••••{activeKey.secret.slice(-4)}</span>
           </span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearActiveKey}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={clearActiveKey}
+          >
             Clear
           </Button>
         </div>
@@ -237,5 +294,5 @@ export function KeysPanel() {
         )}
       </div>
     </>
-  )
+  );
 }

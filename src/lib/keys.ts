@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { egent, EgentError } from './egent'
 
 /**
@@ -68,10 +68,17 @@ export interface CreateKeyInput {
   /**
    * Duration from now, encoded as protobuf Duration (e.g. "2592000s"). Omit for
    * the project default (30d). Talos does not support non-expiring keys; the
-   * project max is 1 year (talos.yaml max_ttl: 8760h). The self surface only
-   * forwards name/ttl/request_id — scopes, ip_restriction, etc. are dropped.
+   * project max is 1 year (talos.yaml max_ttl: 8760h).
    */
   ttl?: string
+  /**
+   * Optional CIDR allowlist (IPv4/IPv6). NOTE: the self surface currently only
+   * forwards name/ttl/request_id to the admin path — ip_restriction is accepted
+   * by the JSON marshaler (DiscardUnknown) but NOT yet enforced. We still send
+   * it so it activates automatically once SelfIssueApiKeyRequest carries the
+   * field. Until then, treat keys as un-restricted.
+   */
+  allowedCidrs?: string[]
 }
 
 /** Issues a new key and auto-activates it for the chat (secret shown once). */
@@ -85,6 +92,9 @@ export function useCreateKey() {
         request_id: crypto.randomUUID(),
       }
       if (input.ttl) body.ttl = input.ttl
+      if (input.allowedCidrs && input.allowedCidrs.length > 0) {
+        body.ip_restriction = { allowed_cidrs: input.allowedCidrs }
+      }
       return egent
         .json<{ issued_api_key: RawIssuedApiKey; secret: string }>(
           '/v2alpha1/self/issuedApiKeys',
@@ -102,6 +112,31 @@ export function useCreateKey() {
       qc.invalidateQueries({ queryKey: ['api-keys'] })
     },
   })
+}
+
+/**
+ * First-run provisioning: when a freshly registered user has zero keys and no
+ * active key in this browser, mint one silently so chat works immediately
+ * (without this, the chat transport throws "No API key…"). Fires at most once
+ * per mount, and only on a genuinely empty account — a user who already has
+ * keys (e.g. on another browser) is left alone so we don't pile up keys.
+ * The minted secret lands in localStorage as the active key (never shown).
+ */
+export function useEnsureApiKey() {
+  const { data: keys, isSuccess } = useKeys()
+  const activeKey = useActiveKey()
+  const createKey = useCreateKey()
+  const fired = useRef(false)
+
+  const noKeys = isSuccess && (keys?.length ?? 0) === 0
+  const shouldMint = noKeys && !activeKey && !createKey.isPending
+
+  useEffect(() => {
+    if (fired.current || !shouldMint) return
+    fired.current = true
+    // Use the project max TTL (1 year) so the auto key doesn't expire under them.
+    createKey.mutate({ name: 'web-app', ttl: '31536000s' })
+  }, [shouldMint, createKey])
 }
 
 /** Revokes a key the user owns. */
