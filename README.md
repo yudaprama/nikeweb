@@ -32,7 +32,9 @@ sends `credentials: 'include'` on every backend call.
 - Conversation sidebar with create/select/delete (`src/components/app-sidebar.tsx`, `src/lib/sessions.ts` → pREST)
 - Chat view with streaming, tool-call + reasoning rendering (`src/components/chat-view.tsx`, ai-elements)
 - Model picker from the Plano proxy (`src/components/model-picker.tsx`, `src/lib/models.ts`)
-- Two data clients kept separate: `src/lib/egent.ts` (agent `/v1/*`) and `src/lib/prest.ts` (CRUD)
+- Data clients kept separate: `src/lib/egent.ts` (agent `/v1/*`), `src/lib/prest.ts` (CRUD),
+  and `src/lib/muninn.ts` (MuninnDB cognitive memory direct via the edge at `/.muninn/api/*`,
+  no egent-lobehub hop — the edge injects identity as the per-user vault)
 
 ## Known follow-ups
 - **Streaming transport:** `chat-view.tsx` uses the AI SDK `DefaultChatTransport` against
