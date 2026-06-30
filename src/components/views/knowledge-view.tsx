@@ -9,7 +9,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
-import { useFiles, useUploadFile, useDeleteFile, formatSize, type KnowledgeFile, KNOWLEDGE_UPLOAD_ACCEPT } from '@/lib/rag'
+import {
+  useFiles,
+  useUploadFile,
+  useDeleteFile,
+  formatSize,
+  type KnowledgeFile,
+  KNOWLEDGE_UPLOAD_ACCEPT,
+  FILEPROCESSOR_SUPPORTED_EXTENSIONS,
+} from '@/lib/rag'
 
 const APPS = [
   { id: 'gmail', name: 'Gmail', initial: 'M', tools: '4 tools', desc: 'Read, draft and send email — with approval.', on: true },
@@ -51,7 +59,7 @@ function FilesSection() {
         ref={inputRef}
         type="file"
         multiple
-        accept=".txt,.md,.markdown,.json,.csv,text/*"
+        accept={KNOWLEDGE_UPLOAD_ACCEPT}
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
       />
@@ -67,7 +75,7 @@ function FilesSection() {
           {upload.isPending ? 'Indexing…' : 'Click to upload'}
         </div>
         <div className="text-muted-foreground mt-0.5 text-xs">
-          Text, Markdown, JSON, CSV — indexed for agent search
+          Supports {FILEPROCESSOR_SUPPORTED_EXTENSIONS.length} fileprocessor types, including PDF, Office, text, image, and video
         </div>
       </button>
 
