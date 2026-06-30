@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
@@ -65,8 +65,11 @@ export function AppSidebar({
   const logout = useLogout()
   const [signingOut, setSigningOut] = useState(false)
 
-  const email =
-    (session?.identity?.traits as { email?: string } | undefined)?.email ?? 'you@example.com'
+  const traits = session?.identity?.traits as
+    | { email?: string; avatar?: string }
+    | undefined
+  const email = traits?.email ?? 'you@example.com'
+  const avatar = traits?.avatar
   const initials = email.slice(0, 2).toUpperCase()
   const needsApproval = false // tasks badge placeholder
   const { data: workspaces } = useWorkspaces()
@@ -227,6 +230,7 @@ export function AppSidebar({
             }
           >
             <Avatar className="size-8 rounded-lg">
+              {avatar && <AvatarImage src={avatar} alt={email} />}
               <AvatarFallback className="rounded-lg text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-sm leading-tight">
