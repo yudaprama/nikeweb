@@ -1,4 +1,5 @@
 import { Plus, Trash2, LogOut } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { ViewHeader } from '@/components/view-header'
@@ -10,6 +11,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   useWorkspaces,
@@ -17,6 +27,7 @@ import {
   useDeleteWorkspace,
   useLeaveWorkspace,
 } from '@/lib/workspaces'
+import { useDeleteAccount } from '@/lib/account'
 import { useActiveWorkspaceId, setActiveWorkspace } from '@/lib/active-workspace'
 import { useBalance, formatMicros } from '@/lib/billing'
 
@@ -214,6 +225,82 @@ export function KeysTab() {
   return <KeysPanel />
 }
 
+export function AccountTab() {
+  const deleteAccount = useDeleteAccount()
+  const [open, setOpen] = useState(false)
+  const [confirm, setConfirm] = useState('')
+
+  const close = () => {
+    setOpen(false)
+    setConfirm('')
+  }
+
+  const handleConfirm = () => {
+    if (confirm !== 'DELETE' || deleteAccount.isPending) return
+    deleteAccount.mutate(undefined, {
+      onError: () => toast.error('Could not delete account. Please retry or contact support.'),
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground max-w-sm text-sm">
+        Closing your account permanently deletes your conversations, files,
+        agents, and workspaces, and signs you out everywhere.
+      </p>
+      <Card className="border-destructive/40">
+        <CardContent className="flex flex-col gap-3 px-4">
+          <div className="text-destructive text-sm font-semibold">Danger zone</div>
+          <p className="text-muted-foreground text-sm">
+            This cannot be undone. You&apos;ll be signed out immediately and the
+            account cannot be recovered.
+          </p>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-fit gap-2"
+            onClick={() => setOpen(true)}
+          >
+            <Trash2 className="size-4" />
+            Delete my account
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete account?</DialogTitle>
+            <DialogDescription>
+              This permanently removes your account and all associated data. Type{' '}
+              <span className="font-mono font-semibold">DELETE</span> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="DELETE"
+            autoComplete="off"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={close}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={confirm !== 'DELETE' || deleteAccount.isPending}
+              onClick={handleConfirm}
+            >
+              {deleteAccount.isPending ? 'Deleting…' : 'Permanently delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 export { WorkspacesTab }
 
 // Tab → sub-path. The route is the source of truth so each tab is deep-linkable.
@@ -221,6 +308,7 @@ const SETTINGS_TABS = [
   { value: 'usage', label: 'Usage & billing', path: '/settings/usage' },
   { value: 'keys', label: 'API keys', path: '/settings/keys' },
   { value: 'workspaces', label: 'Workspaces', path: '/settings/workspaces' },
+  { value: 'account', label: 'Account', path: '/settings/account' },
 ] as const
 
 export function SettingsView() {

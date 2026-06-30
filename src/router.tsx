@@ -21,6 +21,7 @@ import {
   UsageTab,
   KeysTab,
   WorkspacesTab,
+  AccountTab,
 } from '@/components/views/settings-view'
 import { useCreateSession } from '@/lib/sessions'
 import { useEnsureApiKey } from '@/lib/keys'
@@ -177,6 +178,12 @@ const settingsWorkspacesRoute = createRoute({
   component: WorkspacesTab,
 })
 
+const settingsAccountRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/account',
+  component: AccountTab,
+})
+
 const catchAllRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '$',
@@ -199,6 +206,7 @@ const routeTree = rootRoute.addChildren([
       settingsUsageRoute,
       settingsKeysRoute,
       settingsWorkspacesRoute,
+      settingsAccountRoute,
     ]),
   ]),
   catchAllRoute,
