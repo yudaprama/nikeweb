@@ -1,10 +1,13 @@
 import { config } from './config'
 
 /**
- * Client for the egent-lobehub agent runtime (`/v1/*`) behind the auth edge.
- * Always sends the session cookie so the edge can inject identity; never sends
- * a user id. Streaming responses use SSE — the chat UI uses the AI SDK transport
- * (see chat-view) which points at `${edgeUrl}/v1/chat/...`.
+ * Generic edge fetcher for non-streaming JSON endpoints behind the Oathkeeper
+ * auth edge (always sends the session cookie so the edge can inject identity;
+ * never sends a user id). Despite the legacy name, nothing here targets
+ * egent-lobehub anymore — callers hit the Talos self-service surface
+ * (`/v2alpha1/self/*`) and pREST workspace management (`/v1/workspaces/*`).
+ * Chat streaming uses the AI SDK transport (see chat-view) which points at
+ * `${agentUrl}/v1/chat/completions`.
  */
 async function egentFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${config.edgeUrl}${path}`, {
@@ -44,6 +47,4 @@ export const egent = {
     if (!text) return null as T
     return JSON.parse(text) as T
   },
-  /** Endpoint used by the chat transport for streaming completions. */
-  chatStreamUrl: `${config.edgeUrl}/v1/chat/send`,
 }

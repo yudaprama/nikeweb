@@ -3,17 +3,21 @@ import { config } from './config'
 import { getActiveApiKey } from './keys'
 
 /**
- * AI-SDK ChatTransport that streams from Plano's OpenAI-compatible model proxy.
+ * AI-SDK ChatTransport that streams from Plano's agent orchestrator (:8001).
  * The browser calls Plano directly (CORS-enabled) with the user's own API key as
  * a Bearer token — minted in Settings and stored locally (see lib/keys.ts).
  *
- * Plano speaks the OpenAI SSE wire format (`data: {chunk}` … `data: [DONE]`),
- * which `useChat` doesn't understand natively — so this transport translates
- * each `choices[0].delta` into the AI-SDK UI-message stream chunks the chat UI
+ * Plano's Rust orchestrator routes the turn to one of the 20 static agents and
+ * pipes the chosen agent's OpenAI-SSE response straight back to the client as a
+ * transparent byte-level passthrough, so the wire format is the same as the
+ * model proxy: `data: {chunk}` … `data: [DONE]`. This transport translates each
+ * `choices[0].delta` into the AI-SDK UI-message stream chunks the chat UI
  * consumes (`start` → `text-start` → `text-delta`… → `text-end` → `finish`),
  * mirroring the framing the built-in TextStreamChatTransport emits.
  *
- * The proxy is stateless, so the full conversation history is sent each call.
+ * The orchestrator is stateless, so the full conversation history is sent each
+ * call. HITL/intervention surfacing is not supported on :8001 (headless) — see
+ * EGENT_LOBEHUB_DISMANTLE_PLAN.md Step 3.
  */
 export class PlanoChatTransport implements ChatTransport<UIMessage> {
   private readonly opts: { model?: string }
@@ -30,7 +34,7 @@ export class PlanoChatTransport implements ChatTransport<UIMessage> {
     if (!apiKey) {
       throw new Error('No API key. Generate one in Settings → API keys first.')
     }
-    const res = await fetch(`${config.modelProxyUrl}/v1/chat/completions`, {
+    const res = await fetch(`${config.agentUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
