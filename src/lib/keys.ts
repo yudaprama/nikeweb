@@ -63,25 +63,40 @@ export function useKeys() {
   })
 }
 
+export interface CreateKeyInput {
+  name?: string
+  /**
+   * Duration from now, encoded as protobuf Duration (e.g. "2592000s"). Omit for
+   * the project default (30d). Talos does not support non-expiring keys; the
+   * project max is 1 year (talos.yaml max_ttl: 8760h). The self surface only
+   * forwards name/ttl/request_id — scopes, ip_restriction, etc. are dropped.
+   */
+  ttl?: string
+}
+
 /** Issues a new key and auto-activates it for the chat (secret shown once). */
 export function useCreateKey() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (name?: string) =>
-      egent
+    mutationFn: (input: CreateKeyInput = {}) => {
+      const body: Record<string, unknown> = {
+        name: input.name || 'web-app',
+        // Idempotency key (AIP-155) so a double-submit can't mint two keys.
+        request_id: crypto.randomUUID(),
+      }
+      if (input.ttl) body.ttl = input.ttl
+      return egent
         .json<{ issued_api_key: RawIssuedApiKey; secret: string }>(
           '/v2alpha1/self/issuedApiKeys',
-          {
-            method: 'POST',
-            body: JSON.stringify({ name: name || 'web-app' }),
-          },
+          { method: 'POST', body: JSON.stringify(body) },
         )
         .then((r) => ({
           keyId: r.issued_api_key.key_id,
           name: r.issued_api_key.name,
           secret: r.secret,
           expireTime: r.issued_api_key.expire_time,
-        })),
+        }))
+    },
     onSuccess: (data) => {
       setActiveKey({ secret: data.secret, keyId: data.keyId, name: data.name })
       qc.invalidateQueries({ queryKey: ['api-keys'] })

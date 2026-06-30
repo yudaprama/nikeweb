@@ -7,6 +7,13 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,11 +44,14 @@ export function KeysPanel() {
   const [copied, setCopied] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
+  // Talos forbids non-expiring keys; the project max is 1 year, so that's the
+  // closest to "never" and our default. Value is a protobuf Duration string.
+  const [ttl, setTtl] = useState('31536000s')
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const issued = await createKey.mutateAsync(name.trim() || undefined)
+      const issued = await createKey.mutateAsync({ name: name.trim() || undefined, ttl })
       setNewSecret(issued.secret)
       setCopied(false)
       setDialogOpen(false)
@@ -90,18 +100,38 @@ export function KeysPanel() {
             <DialogHeader>
               <DialogTitle>Create API key</DialogTitle>
               <DialogDescription>
-                Give the key a name so you can recognize it later. The secret is shown only
-                once after creation.
+                Name the key and pick how long it stays valid. The secret is shown only once
+                after creation.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <Input
-                autoFocus
-                placeholder="web-app"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={64}
-              />
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  autoFocus
+                  placeholder="web-app"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={64}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Expires</label>
+                <Select value={ttl} onValueChange={(v) => v && setTtl(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="604800s">7 days</SelectItem>
+                    <SelectItem value="2592000s">30 days</SelectItem>
+                    <SelectItem value="7776000s">90 days</SelectItem>
+                    <SelectItem value="31536000s">1 year (max)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  Talos doesn't allow non-expiring keys — 1 year is the project maximum.
+                </p>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -183,14 +213,7 @@ export function KeysPanel() {
                   <KeyRound className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {k.name}
-                    {activeKey?.keyId === k.keyId && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Active
-                      </Badge>
-                    )}
-                  </div>
+                  <div className="text-sm font-medium">{k.name}</div>
                   <div className="text-muted-foreground font-mono text-xs">
                     {k.keyId.slice(0, 8)}…
                   </div>
