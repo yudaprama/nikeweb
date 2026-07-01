@@ -69,24 +69,6 @@ function WorkspacesTab() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {/* Personal scope is always available (workspace_id IS NULL). */}
-        <Card className={activeWsId === null ? 'border-primary' : undefined}>
-          <CardContent className="flex items-center gap-3 px-4">
-            <div className="bg-muted size-10 shrink-0 rounded-lg" />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">Personal</div>
-              <div className="text-muted-foreground text-xs">Just you · no workspace</div>
-            </div>
-            {activeWsId === null ? (
-              <Badge>Active</Badge>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setActiveWorkspace(null)}>
-                Switch
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
         {isLoading && <p className="text-muted-foreground text-sm">Loading workspaces…</p>}
 
         {workspaces?.map((ws) => {

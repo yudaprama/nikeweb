@@ -157,10 +157,6 @@ export function AppSidebar({
               <DropdownMenuLabel className="text-muted-foreground text-xs">
                 Workspaces
               </DropdownMenuLabel>
-              <DropdownMenuItem className="gap-2" onClick={() => setActiveWorkspace(null)}>
-                <span className="flex-1">Personal</span>
-                {activeWsId === null && <Check className="size-4" />}
-              </DropdownMenuItem>
               {workspaces?.map((ws) => (
                 <DropdownMenuItem
                   key={ws.id}
