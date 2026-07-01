@@ -18,7 +18,7 @@ export class PlanoChatTransport extends DefaultChatTransport<UIMessage> {
             Authorization: `Bearer ${apiKey}`,
           },
           body: {
-            model: opts.model ?? 'sage-pro',
+            model: opts.model ?? 'kawai-pro-max',
             stream: true,
             messages: await convertToModelMessages(messages),
           },

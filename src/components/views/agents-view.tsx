@@ -33,9 +33,9 @@ const TOOL_META: { key: string; name: string; desc: string; icon: LucideIcon }[]
 ]
 
 const MODELS = [
-  { id: 'sage-pro', name: 'Sage Pro', price: '$3 / Mtok' },
-  { id: 'sage-mini', name: 'Sage Mini', price: '$0.4 / Mtok' },
-  { id: 'sage-reason', name: 'Sage Reason', price: '$8 / Mtok' },
+  { id: 'kawai-pro-max', name: 'Kawai Pro Max', price: '$3 / Mtok' },
+  { id: 'kawai-pro', name: 'Kawai Pro', price: '$0.4 / Mtok' },
+  { id: 'kawai', name: 'Kawai', price: '$8 / Mtok' },
 ]
 
 function initialsOf(name: string): string {
@@ -53,7 +53,7 @@ function draftFromAgent(a: AgentRow): Draft {
   return {
     name: a.name,
     persona: a.system_prompt ?? '',
-    model: a.model || 'sage-pro',
+    model: a.model || 'kawai-pro-max',
     tools: (a.params?.tools as Record<string, boolean>) ?? {},
   }
 }
@@ -91,7 +91,7 @@ export function AgentsView() {
       const created = await createAgent.mutateAsync({
         name: 'New agent',
         system_prompt: 'You are a helpful assistant.',
-        model: 'sage-pro',
+        model: 'kawai-pro-max',
         params: { tools: {} },
       })
       setActiveId(created.id)
