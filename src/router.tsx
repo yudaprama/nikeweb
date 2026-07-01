@@ -6,6 +6,7 @@ import {
   createRootRoute,
   redirect,
   useNavigate,
+  useParams,
 } from '@tanstack/react-router'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
@@ -27,8 +28,6 @@ import { useCreateSession } from '@/lib/sessions'
 import { useEnsureApiKey } from '@/lib/keys'
 
 interface WorkspaceContextValue {
-  activeId: string | null
-  setActiveId: (id: string | null) => void
   model: string | undefined
   setModel: (model: string | undefined) => void
 }
@@ -71,15 +70,13 @@ function EnsureApiKey() {
 
 function AppLayout() {
   const navigate = useNavigate()
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [model, setModel] = useState<string | undefined>(undefined)
   const createSession = useCreateSession()
 
   const handleNewConversation = async () => {
     const created = await createSession.mutateAsync('New conversation')
     if (created?.id) {
-      setActiveId(created.id)
-      navigate({ to: '/' })
+      navigate({ to: '/chat/$sessionId', params: { sessionId: created.id } })
     }
   }
 
@@ -88,7 +85,7 @@ function AppLayout() {
       {/* Inside the gate → only runs once a Kratos session exists, so the
           self-service key query is never fired anonymously. */}
       <EnsureApiKey />
-      <WorkspaceContext.Provider value={{ activeId, setActiveId, model, setModel }}>
+      <WorkspaceContext.Provider value={{ model, setModel }}>
         <SidebarProvider>
           <AppSidebar
             onNewConversation={handleNewConversation}
@@ -103,22 +100,32 @@ function AppLayout() {
   )
 }
 
-function ChatView() {
-  const { activeId, setActiveId, model, setModel } = useWorkspace()
+function ChatViewWrapper({ sessionId }: { sessionId: string | null }) {
+  const navigate = useNavigate()
+  const { model, setModel } = useWorkspace()
   return (
     <ChatPage
-      activeId={activeId}
-      onSelect={setActiveId}
+      activeId={sessionId}
+      onSelect={(id) => navigate({ to: '/chat/$sessionId', params: { sessionId: id } })}
       model={model}
       onModel={setModel}
     />
   )
 }
 
-const chatRoute = createRoute({
+const chatIndexRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/',
-  component: ChatView,
+  component: () => <ChatViewWrapper sessionId={null} />,
+})
+
+const chatSessionRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/chat/$sessionId',
+  component: function ChatSessionView() {
+    const { sessionId } = useParams({ from: '/chat/$sessionId' })
+    return <ChatViewWrapper sessionId={sessionId} />
+  },
 })
 
 const agentsRoute = createRoute({
@@ -196,7 +203,8 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registrationRoute,
   appLayoutRoute.addChildren([
-    chatRoute,
+    chatIndexRoute,
+    chatSessionRoute,
     agentsRoute,
     knowledgeRoute,
     memoryRoute,
