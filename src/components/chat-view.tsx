@@ -117,9 +117,10 @@ interface ChatThreadProps extends ChatViewProps {
 }
 
 function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
-  // Streams from Plano's OpenAI-compatible model proxy with the user's API key
-  // (see plano-transport). The proxy is stateless, so each completed turn is
-  // persisted to pREST (lib/messages) for reload — best-effort, never blocking.
+  // Streams from Plano's agent orchestrator via streamText() + an OpenAI-
+  // compatible provider (see plano-transport). Tool-calls and reasoning are
+  // parsed natively by the provider. Each completed turn is persisted to pREST
+  // (lib/messages) for reload — best-effort, never blocking the chat.
   const transport = useMemo(() => new PlanoChatTransport({ model }), [model])
 
   const { messages, sendMessage, status, stop } = useChat({
