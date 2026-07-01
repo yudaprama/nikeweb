@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useChat } from '@ai-sdk/react'
 import type { UIMessage } from 'ai'
 import { PlanoChatTransport } from '@/lib/plano-transport'
 import { useMessages, saveMessage, type MessageRow, type PersistedToolPart } from '@/lib/messages'
+import { useRenameSession } from '@/lib/sessions'
+import { generateConversationTitle } from '@/lib/title'
 import {
   Conversation,
   ConversationContent,
@@ -123,6 +125,13 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
   // (lib/messages) for reload — best-effort, never blocking the chat.
   const transport = useMemo(() => new PlanoChatTransport({ model }), [model])
 
+  const renameSession = useRenameSession()
+  // Only fresh conversations (no seeded history) get an auto-generated title.
+  const canAutoTitle = initialMessages.length === 0
+  // Guards so the title is generated exactly once per conversation.
+  const titledRef = useRef(false)
+  const firstUserTextRef = useRef<string | null>(null)
+
   const { messages, sendMessage, status, stop } = useChat({
     id: sessionId,
     transport,
@@ -137,6 +146,17 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
           reasoning: reasoningOf(message) || undefined,
           tools: toolsOf(message),
         }).catch((e) => console.error('persist assistant message failed', e))
+
+        // After the first assistant reply, summarize the exchange into a title
+        // and rename the session so the sidebar/header updates. Runs once.
+        if (canAutoTitle && !titledRef.current && firstUserTextRef.current) {
+          titledRef.current = true
+          void generateConversationTitle(firstUserTextRef.current, text)
+            .then((title) => {
+              if (title) renameSession.mutate({ id: sessionId, title })
+            })
+            .catch((e) => console.error('generate conversation title failed', e))
+        }
       }
     },
   })
@@ -144,6 +164,7 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
   const handleSubmit = (msg: PromptInputMessage) => {
     const text = msg.text.trim()
     if (!text) return
+    if (firstUserTextRef.current === null) firstUserTextRef.current = text
     void saveMessage({ role: 'user', content: text, sessionId }).catch((e) =>
       console.error('persist user message failed', e),
     )
