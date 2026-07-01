@@ -16,10 +16,13 @@ interface ModelPickerProps {
 export function ModelPicker({ value, onChange }: ModelPickerProps) {
   const { data: models, isLoading } = useModels()
 
-  // Plano's model proxy requires a model id, so default to the first available
-  // one until the user picks otherwise (avoids a "Model '' not found" first turn).
+  // Auto-select the first model when none is chosen, or when the current
+  // selection is no longer in the available list (e.g. model source changed).
   useEffect(() => {
-    if (!value && models && models.length > 0) onChange(models[0].id)
+    if (!models || models.length === 0) return
+    if (!value || !models.some((m) => m.id === value)) {
+      onChange(models[0].id)
+    }
   }, [value, models, onChange])
 
   return (
