@@ -123,7 +123,7 @@ const chatSessionRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/chat/$sessionId',
   component: function ChatSessionView() {
-    const { sessionId } = useParams({ from: '/chat/$sessionId' })
+    const { sessionId } = useParams({ from: chatSessionRoute.id })
     return <ChatViewWrapper sessionId={sessionId} />
   },
 })
