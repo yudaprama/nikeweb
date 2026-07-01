@@ -5,6 +5,7 @@ import { PlanoChatTransport } from '@/lib/plano-transport'
 import { useMessages, saveMessage, type MessageRow, type PersistedToolPart } from '@/lib/messages'
 import { useRenameSession } from '@/lib/sessions'
 import { generateConversationTitle } from '@/lib/title'
+import { uploadChatAttachment } from '@/lib/uploads'
 import {
   Conversation,
   ConversationContent,
@@ -26,13 +27,25 @@ import {
 } from '@/components/ai-elements/tool'
 import {
   PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
-  PromptInputTextarea,
   PromptInputFooter,
-  PromptInputTools,
+  PromptInputHeader,
   PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
+import {
+  Attachment,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments,
+} from '@/components/ai-elements/attachments'
 
 interface ChatViewProps {
   sessionId: string
@@ -118,6 +131,27 @@ interface ChatThreadProps extends ChatViewProps {
   initialMessages: UIMessage[]
 }
 
+/** Inline attachment chips shown above the textarea while composing. Reads the
+ * PromptInput attachment context (validation + remove handling come free). */
+function PromptInputAttachmentsDisplay() {
+  const attachments = usePromptInputAttachments()
+  if (attachments.files.length === 0) return null
+  return (
+    <Attachments variant="inline">
+      {attachments.files.map((attachment) => (
+        <Attachment
+          data={attachment}
+          key={attachment.id}
+          onRemove={() => attachments.remove(attachment.id)}
+        >
+          <AttachmentPreview />
+          <AttachmentRemove />
+        </Attachment>
+      ))}
+    </Attachments>
+  )
+}
+
 function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
   // Streams from Plano's agent orchestrator via streamText() + an OpenAI-
   // compatible provider (see plano-transport). Tool-calls and reasoning are
@@ -161,14 +195,34 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
     },
   })
 
-  const handleSubmit = (msg: PromptInputMessage) => {
+  const handleSubmit = async (msg: PromptInputMessage) => {
     const text = msg.text.trim()
-    if (!text) return
-    if (firstUserTextRef.current === null) firstUserTextRef.current = text
-    void saveMessage({ role: 'user', content: text, sessionId }).catch((e) =>
+    const files = msg.files ?? []
+    if (!text && files.length === 0) return
+
+    // Upload attachments to AList (storage + RAG ingest via its upload hook, so
+    // the agent's knowledge_search can read them). Best-effort: a failed upload
+    // is logged but doesn't block the turn — the user can resend.
+    const uploaded: string[] = []
+    if (files.length > 0) {
+      const results = await Promise.allSettled(files.map((f) => uploadChatAttachment(f)))
+      for (const r of results) {
+        if (r.status === 'fulfilled') uploaded.push(r.value)
+        else console.error('chat attachment upload failed', r.reason)
+      }
+    }
+
+    // The egent reads only the text parts of a message, so reference attachments
+    // by name rather than shipping their bytes in the chat request.
+    const fileNote =
+      uploaded.length > 0 ? `\n\n[Attached: ${uploaded.join(', ')}]` : ''
+    const content = text + fileNote
+
+    if (firstUserTextRef.current === null) firstUserTextRef.current = text || content
+    void saveMessage({ role: 'user', content, sessionId }).catch((e) =>
       console.error('persist user message failed', e),
     )
-    sendMessage({ text })
+    sendMessage({ text: content })
   }
 
   return (
@@ -228,12 +282,22 @@ function ChatThread({ sessionId, model, initialMessages }: ChatThreadProps) {
       </Conversation>
 
       <div className="border-t p-4">
-        <PromptInput onSubmit={handleSubmit}>
+        <PromptInput onSubmit={handleSubmit} multiple globalDrop>
+          <PromptInputHeader>
+            <PromptInputAttachmentsDisplay />
+          </PromptInputHeader>
           <PromptInputBody>
             <PromptInputTextarea placeholder="Send a message…" />
           </PromptInputBody>
           <PromptInputFooter>
-            <PromptInputTools />
+            <PromptInputTools>
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger />
+                <PromptInputActionMenuContent>
+                  <PromptInputActionAddAttachments />
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
+            </PromptInputTools>
             <PromptInputSubmit status={status} onStop={stop} />
           </PromptInputFooter>
         </PromptInput>
