@@ -26,7 +26,7 @@
     "@tanstack/react-router": "^1.170.16",
     "@xyflow/react": "^12.11.1",
     "ai": "^7.0.3",
-    "alist-kratos-sdk": "^2.0.1",
+    "alist-kratos-sdk": "^2.1.0",
     "ansi-to-react": "^6.2.6",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
