@@ -22,13 +22,12 @@ let clientPromise: Promise<AlistClient> | null = null
 function getAlistClient(): Promise<AlistClient> {
   if (!clientPromise) {
     // fromKratosSession just constructs a client pointed at the edge + mount
-    // prefix; the cookie does the authentication on each request.
+    // prefix; the cookie does the authentication on each request. It does not
+    // pre-validate the session — a missing/expired Kratos cookie surfaces as a
+    // 401/403 on the first request (e.g. upload), which the caller handles.
     clientPromise = AlistClient.fromKratosSession(
       `${config.edgeUrl}/.assets/alist`,
-    ).then((c) => {
-      if (!c) throw new Error('No Kratos session — user must be logged in')
-      return c
-    })
+    )
   }
   return clientPromise
 }
